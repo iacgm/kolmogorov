@@ -24,8 +24,8 @@ impl Term {
 				if *x == var {
 					let free = code.free_vars();
 					let new = new_var_where(|s| s != var && !free.contains(s)).unwrap();
-					*x = new;
 					b.sub(x, Var(new));
+					*x = new;
 				}
 				b.sub(var, code);
 			}
@@ -50,10 +50,20 @@ impl Term {
 					*self = terms.pop().unwrap();
 					self.beta()
 				}
-				[Self::Lam(v, _), _, ..] => {
-					let v = *v;
+				[Self::Lam(_, _), _, ..] => {
 					let a = terms.remove(1);
-					terms[0].sub(v, a);
+
+					match std::mem::replace(&mut terms[0], Self::Num(0)) {
+						Self::Lam(v, mut b) => {
+							b.sub(v, a);
+							terms[0] = *b;
+						}
+						_ => unreachable!(),
+					}
+
+					if terms.len() == 1 {
+						*self = terms.pop().unwrap();
+					}
 					true
 				}
 				_ => false,
@@ -101,8 +111,7 @@ impl std::fmt::Display for Term {
 			Self::Lit(s, _) => write!(fmt, "{}", s),
 			Self::Lam(v, b) => write!(fmt, "{} -> {}", v, b),
 			Self::App(terms) => {
-				write!(fmt, "{}", terms[0])?;
-				for term in &terms[1..] {
+				for term in terms {
 					write!(fmt, "({})", term)?;
 				}
 				Ok(())
