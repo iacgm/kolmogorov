@@ -3,8 +3,9 @@ pub use parser::*;
 
 mod types;
 use std::collections::HashSet;
+use std::rc::Rc;
 
-type Literal = fn(Term) -> Term;
+type Literal = Rc<dyn Fn(&mut Vec<Term>) -> bool>;
 
 #[derive(Clone)]
 pub enum Term {
@@ -12,6 +13,8 @@ pub enum Term {
 	Var(&'static str),
 	Lit(&'static str, Literal),
 	Lam(&'static str, Box<Term>),
+	//Backwards representation of applications to facilitate
+	//pushing & popping from the front
 	App(Vec<Term>),
 }
 
@@ -50,29 +53,37 @@ impl Term {
 					*self = terms.pop().unwrap();
 					self.beta()
 				}
-				[Self::Lam(_, _), _, ..] => {
-					let a = terms.remove(1);
+				[.., _, Lam(_, _)] => {
+					let Some(Lam(v, mut b)) = terms.pop() else {
+						unreachable!()
+					};
+					let Some(a) = terms.pop() else { unreachable!() };
 
-					match std::mem::replace(&mut terms[0], Self::Num(0)) {
-						Self::Lam(v, mut b) => {
-							b.sub(v, a);
-							terms[0] = *b;
-						}
-						_ => unreachable!(),
-					}
+					b.sub(v, a);
+					terms.push(*b);
 
-					if terms.len() == 1 {
-						*self = terms.pop().unwrap();
-					}
-					true
+					false
+				}
+				[.., Lit(_, _)] => {
+					let Some(Lit(_, transform)) = terms.pop() else {
+						unreachable!()
+					};
+
+					transform(terms);
+
+					false
 				}
 				_ => false,
 			},
 		}
 	}
 
-	pub fn normalize(&mut self, limit: u32) -> bool {
-		for i in 0..limit {
+	pub fn normalize(&mut self) {
+		while !self.beta() {}
+	}
+
+	pub fn bounded_normalize(&mut self, limit: u32) -> bool {
+		for _ in 0..limit {
 			if self.beta() {
 				return true;
 			}
@@ -109,9 +120,9 @@ impl std::fmt::Display for Term {
 			Self::Num(k) => write!(fmt, "{}", k),
 			Self::Var(v) => write!(fmt, "{}", v),
 			Self::Lit(s, _) => write!(fmt, "{}", s),
-			Self::Lam(v, b) => write!(fmt, "{} -> {}", v, b),
+			Self::Lam(v, b) => write!(fmt, "\\{} -> {}", v, b),
 			Self::App(terms) => {
-				for term in terms {
+				for term in terms.iter().rev() {
 					write!(fmt, "({})", term)?;
 				}
 				Ok(())
