@@ -4,14 +4,39 @@ pub use program::*;
 fn main() {
 
     use Term::*;
-    let sum = literal!(
+    let sum = literal!(sum:
         [Num(x), Num(y)] => Num(x+y);
         [x, y] => Num(-1);
     );
     
-    let mut code = term!((@sum) 1 (x -> x));
+    let cons = term!("h" -> "t" -> "s" -> "s" "h" "t");
+    let t = term!("x" -> "y" -> "x");
+    let f = term!("x" -> "y" -> "y");
+    let nil = term!("nil");
 
-    println!("{}", code);
-    code.bounded_normalize(100);
-    println!("{}", code);
+    let isnil = literal!(isnil:
+        [Var("nil")] => term!("x" -> "y" -> "x");
+        [_] => term!("x" -> "y" -> "y");
+    );
+
+    let head = term!("l" -> "l" t);
+    let tail = term!("l" -> "l" f);
+
+    let list = term!(cons 1 (cons 2 (cons 3 nil)));
+
+    println!("list: {}", list);
+
+    exec(&list);
+ 	exec(&term!(head list));
+ 	exec(&term!(head (tail list)));
+	exec(&term!(head (tail (tail list))));
+	exec(&term!(head (tail (tail (tail list)))));
+
+}
+
+fn exec(term: &Term) {
+    let mut term = term.clone();
+	println!("{}:", term);	
+	term.normalize();
+    println!("\t{}", term);
 }

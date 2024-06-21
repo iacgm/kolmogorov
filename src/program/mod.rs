@@ -11,6 +11,7 @@ type Literal = Rc<dyn Fn(&mut Vec<Term>) -> bool>;
 pub enum Term {
 	Num(i32),
 	Var(&'static str),
+	Nam(&'static str, Box<Term>),
 	Lit(&'static str, Literal),
 	Lam(&'static str, Box<Term>),
 	//Backwards representation of applications to facilitate
@@ -23,6 +24,7 @@ impl Term {
 		use Term::*;
 		match self {
 			Var(x) if *x == var => *self = code,
+			Nam(_, b) => b.sub(var, code),
 			Lam(x, b) => {
 				if *x == var {
 					let free = code.free_vars();
@@ -47,8 +49,8 @@ impl Term {
 		use Term::*;
 		match self {
 			Num(_) | Var(_) | Lit(_, _) => true,
-			Lam(_, b) => b.beta(),
-			App(terms) => match &terms[..] {
+			Nam(_, b) | Lam(_, b) => b.beta(),
+			App(terms) => match &mut terms[..] {
 				[_] => {
 					*self = terms.pop().unwrap();
 					self.beta()
@@ -69,11 +71,28 @@ impl Term {
 						unreachable!()
 					};
 
-					transform(terms);
+					transform(terms)
+				}
+				[.., Nam(_, _)] => {
+					let Some(Nam(_, term)) = terms.pop() else {
+						unreachable!()
+					};
+
+					terms.push(*term);
 
 					false
 				}
-				_ => false,
+				[.., App(_)] => {
+					let Some(App(start)) = terms.pop() else {
+						unreachable!()
+					};
+
+					terms.extend(start);
+
+					false
+				}
+				[args @ .., _] => args.iter_mut().rev().all(|arg| arg.beta()),
+				[] => unreachable!(),
 			},
 		}
 	}
@@ -118,9 +137,10 @@ impl std::fmt::Display for Term {
 	fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
 			Self::Num(k) => write!(fmt, "{}", k),
+			Self::Nam(name, _) => write!(fmt, "{}", name),
 			Self::Var(v) => write!(fmt, "{}", v),
 			Self::Lit(s, _) => write!(fmt, "{}", s),
-			Self::Lam(v, b) => write!(fmt, "\\{} -> {}", v, b),
+			Self::Lam(v, b) => write!(fmt, "({}->{})", v, b),
 			Self::App(terms) => {
 				for term in terms.iter().rev() {
 					write!(fmt, "({})", term)?;

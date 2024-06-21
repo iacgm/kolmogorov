@@ -1,16 +1,17 @@
 #[macro_export]
 macro_rules! term {
-	(@$x: ident) => {
-		$crate::Term::Lit(stringify!($x), $x)
-	};
 	($x: ident) => {
-		$crate::Term::Var(stringify!($x))	
+		$crate::Term::Nam(stringify!($x), $x.clone().into())
 	};
 	($x: literal) => {
-		$crate::Term::Num($x)
+		if let Ok(n) = stringify!($x).parse::<i32>() {
+			$crate::Term::Num(n)
+		} else {
+			$crate::Term::Var(&stringify!($x)[1..stringify!($x).len()-1])
+		}
 	};
-	($x:ident -> $($r:tt)+) => {
-		$crate::Term::Lam(stringify!($x), term!($($r)+).into())
+	($x:literal -> $($r:tt)+) => {
+		$crate::Term::Lam($x, term!($($r)+).into())
 	};
 	(($($r:tt)+)) => {
 		term!($($r)+)
@@ -24,8 +25,8 @@ macro_rules! term {
 
 #[macro_export]
 macro_rules! literal {
-	($([$($arg:pat_param),+] => $body:expr;)+) => {
-		std::rc::Rc::new(|_args : &mut Vec<$crate::Term>|{
+	($name:ident: $([$($arg:pat_param),+] => $body:expr;)+) => {{
+		let func = std::rc::Rc::new(|_args : &mut Vec<$crate::Term>|{
 			#[allow(irrefutable_let_patterns)]
 			#[allow(unused_variables)]
 			match &_args[..] {
@@ -43,8 +44,10 @@ macro_rules! literal {
 				_ => false
 			}
 
-		})
-	}
+		});
+
+		$crate::Term::Lit(stringify!($name), func)
+	}}
 }
 
 #[macro_export]
