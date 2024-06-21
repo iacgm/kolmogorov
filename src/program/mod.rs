@@ -9,7 +9,7 @@ type Literal = Rc<dyn Fn(&mut Vec<Term>) -> bool>;
 
 #[derive(Clone)]
 pub enum Term {
-	Num(u32),
+	Num(i32),
 	Var(&'static str),
 	Lit(&'static str, Literal),
 	Lam(&'static str, Box<Term>),

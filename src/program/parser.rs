@@ -24,26 +24,35 @@ macro_rules! term {
 
 #[macro_export]
 macro_rules! literal {
-	([$($arg:pat_param),+] => $body:expr) => {
+	($([$($arg:pat_param),+] => $body:expr;)+) => {
 		std::rc::Rc::new(|_args : &mut Vec<$crate::Term>|{
-			if (_args.len() < count!($($arg),+)){
-				return false
+			#[allow(irrefutable_let_patterns)]
+			#[allow(unused_variables)]
+			match &_args[..] {
+				$(
+					rev_pat!([$($arg),+]) => {
+						$(let $arg = _args.pop().unwrap() else {
+							unimplemented!()
+						};)*
+
+						_args.push($body);
+
+						true
+					}
+				)+
+				_ => false
 			}
 
-			$(let $arg = _args.pop().unwrap() else {
-				unimplemented!()
-			};)*
-
-			_args.push($body);
-
-			true
 		})
 	}
 }
 
 #[macro_export]
-macro_rules! count {
-    () => (0);
-	($x:pat_param) => (1);
-    ($x:pat_param, $($xs:pat_param),*) => (1 + count!($($xs),*));
+macro_rules! rev_pat {
+    ([] $($reversed:pat_param),*) => { 
+        [.., $($reversed),*]
+    };
+    ([$first:pat_param $(, $rest:pat_param)*] $($reversed:pat_param),*) => { 
+        rev_pat!([$($rest),*] $first $(,$reversed)*)
+    };
 }
