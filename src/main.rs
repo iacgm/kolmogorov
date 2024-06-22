@@ -22,8 +22,15 @@ fn main() {
     let head = term!("l" -> "l" t);
     let tail = term!("l" -> "l" f);
 
-    let list = term!(cons 1 (cons 2 (cons 3 nil)));
-
+    let make_list = |elems: &[Term]| {
+        let mut out = term!(nil);
+        for elem in elems.iter().rev() {
+            out = term!(cons [elem] [out]);
+        }
+        out
+    };
+    
+    let list = make_list(&[term!(1),term!(2),term!(3)]);
     println!("list: {}", list);
 
     exec(&list);

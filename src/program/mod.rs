@@ -97,6 +97,17 @@ impl Term {
 		}
 	}
 
+	pub fn expand(&mut self) {
+		match self {
+			Self::Nam(_, boxed) => {
+				*self = std::mem::replace(boxed.as_mut(), Self::Num(0));
+			},
+			Self::App(terms) => terms.iter_mut().for_each(|term| term.expand()),
+			Self::Lam(_, b) => b.expand(),
+			_ => (),
+		}
+	}
+
 	pub fn normalize(&mut self) {
 		while !self.beta() {}
 	}
@@ -142,7 +153,8 @@ impl std::fmt::Display for Term {
 			Self::Lit(s, _) => write!(fmt, "{}", s),
 			Self::Lam(v, b) => write!(fmt, "({}->{})", v, b),
 			Self::App(terms) => {
-				for term in terms.iter().rev() {
+				write!(fmt, "{}", terms.last().unwrap())?;
+				for term in terms[..terms.len()-1].iter().rev() {
 					write!(fmt, "({})", term)?;
 				}
 				Ok(())

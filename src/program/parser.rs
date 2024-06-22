@@ -3,6 +3,9 @@ macro_rules! term {
 	($x: ident) => {
 		$crate::Term::Nam(stringify!($x), $x.clone().into())
 	};
+	([$x: ident]) => {
+		$x.clone()
+	};
 	($x: literal) => {
 		if let Ok(n) = stringify!($x).parse::<i32>() {
 			$crate::Term::Num(n)
