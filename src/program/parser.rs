@@ -16,6 +16,9 @@ macro_rules! term {
 	($x:literal -> $($r:tt)+) => {
 		$crate::Term::Lam($x, term!($($r)+).into())
 	};
+	($x:literal $($xs:literal)+ -> $($r:tt)+) => {
+		$crate::Term::Lam($x, term!($($xs)* -> $($r)+).into())
+	};
 	(($($r:tt)+)) => {
 		term!($($r)+)
 	};
@@ -28,16 +31,25 @@ macro_rules! term {
 
 #[macro_export]
 macro_rules! literal {
-	($name:ident: $([$($arg:pat_param),+] => $body:expr;)+) => {{
-		let func = std::rc::Rc::new(|_args : &mut Vec<$crate::Term>|{
+	($name:ident: $([$($(!$(|$_:tt|)?)? $arg:ident),+] => $body:expr;)+) => {{
+		use $crate::Term;
+		use std::rc::Rc;
+
+		let func = Rc::new(|_args : &mut Vec<Term>|{
 			#[allow(irrefutable_let_patterns)]
 			#[allow(unused_variables)]
+			#[allow(unused_mut)]
 			match &_args[..] {
 				$(
-					rev_pat!([$($arg),+]) => {
-						$(let $arg = _args.pop().unwrap() else {
+					rev_list!([$($arg),+]) => {
+						$(let mut $arg = _args.pop().unwrap() else {
 							unimplemented!()
-						};)*
+						};
+						$(
+							$arg.normalize();
+							$arg.expand();
+						$($_)?)?
+						)*
 
 						_args.push($body);
 
@@ -49,16 +61,16 @@ macro_rules! literal {
 
 		});
 
-		$crate::Term::Lit(stringify!($name), func)
+		Term::Lit(stringify!($name), func)
 	}}
 }
 
 #[macro_export]
-macro_rules! rev_pat {
-    ([] $($reversed:pat_param),*) => { 
+macro_rules! rev_list {
+    ([] $($reversed:ident),*) => { 
         [.., $($reversed),*]
     };
-    ([$first:pat_param $(, $rest:pat_param)*] $($reversed:pat_param),*) => { 
-        rev_pat!([$($rest),*] $first $(,$reversed)*)
+    ([$first:ident $(, $rest:ident)*] $($reversed:ident),*) => { 
+        rev_list!([$($rest),*] $first $(,$reversed)*)
     };
 }

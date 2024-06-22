@@ -71,7 +71,7 @@ impl Term {
 						unreachable!()
 					};
 
-					transform(terms)
+					!transform(terms) && self.beta()
 				}
 				[.., Nam(_, _)] => {
 					let Some(Nam(_, term)) = terms.pop() else {
@@ -101,6 +101,7 @@ impl Term {
 		match self {
 			Self::Nam(_, boxed) => {
 				*self = std::mem::replace(boxed.as_mut(), Self::Num(0));
+				self.expand();
 			},
 			Self::App(terms) => terms.iter_mut().for_each(|term| term.expand()),
 			Self::Lam(_, b) => b.expand(),
