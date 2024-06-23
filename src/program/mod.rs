@@ -1,18 +1,17 @@
 pub mod parser;
+pub mod context;
+pub mod types;
+
 pub use parser::*;
+pub use context::*;
+pub use types::*;
 
-mod types;
 use std::collections::HashSet;
-use std::rc::Rc;
-
-type Literal = Rc<dyn Fn(&mut Vec<Term>) -> bool>;
 
 #[derive(Clone)]
 pub enum Term {
 	Num(i32),
 	Var(&'static str),
-	Nam(&'static str, Box<Term>),
-	Lit(&'static str, Literal),
 	Lam(&'static str, Box<Term>),
 	//Backwards representation of applications to facilitate
 	//pushing & popping from the front
@@ -20,11 +19,49 @@ pub enum Term {
 }
 
 impl Term {
+	pub fn exec(&mut self, context: &mut Context) {
+		use Term::*;
+		loop {
+			match self {
+				Num(_) | Var(_) => break, 
+				Lam(v, b) => {
+					context.set_active(v, false);
+					b.exec(context);
+					context.set_active(v, true);
+					break
+				},
+				App(terms) => {
+					if let [.., App(_)] = &terms[..] {
+						let Some(App(start)) = terms.pop() else {
+							unreachable!()
+						};
+
+						terms.extend(start);
+						continue;
+					}
+
+					if context.reduce(terms) {
+						continue;
+					}
+
+					if !self.head_red() {
+						continue;
+					}
+
+					if !self.beta() {
+						continue;
+					}
+
+					break
+				}
+			}	
+		}
+	}
+
 	pub fn sub(&mut self, var: &'static str, code: Term) {
 		use Term::*;
 		match self {
 			Var(x) if *x == var => *self = code,
-			Nam(_, b) => b.sub(var, code),
 			Lam(x, b) => {
 				if *x == var {
 					let free = code.free_vars();
@@ -44,12 +81,61 @@ impl Term {
 		}
 	}
 
+	//A singular head reduction, returns true if in head normal form
+	pub fn head_red(&mut self) -> bool {
+		use Term::*;
+		match self {
+			Num(_) | Var(_) => true,
+			Lam(_, b) => b.head_red(),
+			App(terms) => match &mut terms[..] {
+				[_] => {
+					*self = terms.pop().unwrap();
+					self.head_red()
+				}
+				[.., _, Lam(_, _)] => {
+					let Some(Lam(v, mut b)) = terms.pop() else {
+						unreachable!()
+					};
+					let Some(a) = terms.pop() else { unreachable!() };
+
+					b.sub(v, a);
+					terms.push(*b);
+
+					false
+				}
+				[.., App(_)] => {
+					let Some(App(start)) = terms.pop() else {
+						unreachable!()
+					};
+
+					terms.extend(start);
+
+					self.head_red()
+				}
+				_ => true,
+			},
+		}
+	}
+
+	pub fn hnf(&mut self) {
+		while !self.head_red() {}
+	}
+
+	pub fn hnf_bounded(&mut self, limit: u32) -> bool {
+		for _ in 0..limit {
+			if self.head_red() {
+				return true;
+			}
+		}
+		false
+	}
+
 	//A singular left-most reduction. Returns true if in β-nf
 	pub fn beta(&mut self) -> bool {
 		use Term::*;
 		match self {
-			Num(_) | Var(_) | Lit(_, _) => true,
-			Nam(_, b) | Lam(_, b) => b.beta(),
+			Num(_) | Var(_) => true,
+			Lam(_, b) => b.beta(),
 			App(terms) => match &mut terms[..] {
 				[_] => {
 					*self = terms.pop().unwrap();
@@ -66,22 +152,6 @@ impl Term {
 
 					false
 				}
-				[.., Lit(_, _)] => {
-					let Some(Lit(_, transform)) = terms.pop() else {
-						unreachable!()
-					};
-
-					!transform(terms) && self.beta()
-				}
-				[.., Nam(_, _)] => {
-					let Some(Nam(_, term)) = terms.pop() else {
-						unreachable!()
-					};
-
-					terms.push(*term);
-
-					false
-				}
 				[.., App(_)] => {
 					let Some(App(start)) = terms.pop() else {
 						unreachable!()
@@ -89,7 +159,7 @@ impl Term {
 
 					terms.extend(start);
 
-					false
+					self.beta()
 				}
 				[args @ .., _] => args.iter_mut().rev().all(|arg| arg.beta()),
 				[] => unreachable!(),
@@ -97,23 +167,11 @@ impl Term {
 		}
 	}
 
-	pub fn expand(&mut self) {
-		match self {
-			Self::Nam(_, boxed) => {
-				*self = std::mem::replace(boxed.as_mut(), Self::Num(0));
-				self.expand();
-			},
-			Self::App(terms) => terms.iter_mut().for_each(|term| term.expand()),
-			Self::Lam(_, b) => b.expand(),
-			_ => (),
-		}
-	}
-
 	pub fn normalize(&mut self) {
 		while !self.beta() {}
 	}
 
-	pub fn bounded_normalize(&mut self, limit: u32) -> bool {
+	pub fn normalize_bounded(&mut self, limit: u32) -> bool {
 		for _ in 0..limit {
 			if self.beta() {
 				return true;
@@ -149,13 +207,11 @@ impl std::fmt::Display for Term {
 	fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
 			Self::Num(k) => write!(fmt, "{}", k),
-			Self::Nam(name, _) => write!(fmt, "{}", name),
 			Self::Var(v) => write!(fmt, "{}", v),
-			Self::Lit(s, _) => write!(fmt, "{}", s),
 			Self::Lam(v, b) => write!(fmt, "({}->{})", v, b),
 			Self::App(terms) => {
 				write!(fmt, "{}", terms.last().unwrap())?;
-				for term in terms[..terms.len()-1].iter().rev() {
+				for term in terms[..terms.len() - 1].iter().rev() {
 					write!(fmt, "({})", term)?;
 				}
 				Ok(())

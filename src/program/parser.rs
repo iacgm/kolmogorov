@@ -1,23 +1,19 @@
 #[macro_export]
 macro_rules! term {
 	($x: ident) => {
-		$crate::Term::Nam(stringify!($x), $x.clone().into())
+		$crate::Term::Var(stringify!($x))
 	};
 	([$x: ident]) => {
 		$x.clone()
 	};
 	($x: literal) => {
-		if let Ok(n) = stringify!($x).parse::<i32>() {
-			$crate::Term::Num(n)
-		} else {
-			$crate::Term::Var(&stringify!($x)[1..stringify!($x).len()-1])
-		}
+		$crate::Term::Num($x)
 	};
-	($x:literal -> $($r:tt)+) => {
-		$crate::Term::Lam($x, term!($($r)+).into())
+	($x:ident -> $($r:tt)+) => {
+		$crate::Term::Lam(stringify!($x), term!($($r)+).into())
 	};
-	($x:literal $($xs:literal)+ -> $($r:tt)+) => {
-		$crate::Term::Lam($x, term!($($xs)* -> $($r)+).into())
+	($x:ident $($xs:ident)+ -> $($r:tt)+) => {
+		$crate::Term::Lam(stringify!($x), term!($($xs)* -> $($r)+).into())
 	};
 	(($($r:tt)+)) => {
 		term!($($r)+)
@@ -31,37 +27,19 @@ macro_rules! term {
 
 #[macro_export]
 macro_rules! literal {
-	($name:ident: $([$($(!$(|$_:tt|)?)? $arg:ident),+] => $body:expr;)+) => {{
-		use $crate::Term;
-		use std::rc::Rc;
+	([$($arg:ident),+] => $body:expr) => {{
+		use $crate::*;
+		ContextEntry {
+			active: true,
+			n_args: count!($($arg)+),
+			func: std::rc::Rc::new(move |_args| {
+				let rev_list!([$($arg),+]) = &mut _args[..] else {
+					unreachable!()
+				};
 
-		let func = Rc::new(|_args : &mut Vec<Term>|{
-			#[allow(irrefutable_let_patterns)]
-			#[allow(unused_variables)]
-			#[allow(unused_mut)]
-			match &_args[..] {
-				$(
-					rev_list!([$($arg),+]) => {
-						$(let mut $arg = _args.pop().unwrap() else {
-							unimplemented!()
-						};
-						$(
-							$arg.normalize();
-							$arg.expand();
-						$($_)?)?
-						)*
-
-						_args.push($body);
-
-						true
-					}
-				)+
-				_ => false
-			}
-
-		});
-
-		Term::Lit(stringify!($name), func)
+				$body
+			})
+		}
 	}}
 }
 
@@ -73,4 +51,10 @@ macro_rules! rev_list {
     ([$first:ident $(, $rest:ident)*] $($reversed:ident),*) => { 
         rev_list!([$($rest),*] $first $(,$reversed)*)
     };
+}
+
+#[macro_export]
+macro_rules! count {
+    () => { 0 };
+    ($x:ident $($xs:ident)*) => { 1 + count!($($xs)*)};
 }
