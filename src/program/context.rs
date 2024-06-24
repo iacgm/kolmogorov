@@ -9,6 +9,7 @@ pub struct ContextEntry {
 	pub n_args: usize,
 	pub func: Rc<BuiltIn>,
 	pub active: bool,
+	pub ty: Type,
 }
 
 pub struct Context {
@@ -45,6 +46,7 @@ impl Context {
 				n_args,
 				func,
 				active,
+				..
 			}) if *active && *n_args <= n => {			
 				terms.pop();
 				let index = n - n_args;

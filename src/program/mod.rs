@@ -1,9 +1,9 @@
-pub mod parser;
 pub mod context;
+pub mod parser;
 pub mod types;
 
-pub use parser::*;
 pub use context::*;
+pub use parser::*;
 pub use types::*;
 
 use std::collections::HashSet;
@@ -23,13 +23,13 @@ impl Term {
 		use Term::*;
 		loop {
 			match self {
-				Num(_) | Var(_) => break, 
+				Num(_) | Var(_) => break,
 				Lam(v, b) => {
 					context.set_active(v, false);
 					b.exec(context);
 					context.set_active(v, true);
-					break
-				},
+					break;
+				}
 				App(terms) => {
 					if let [.., App(_)] = &terms[..] {
 						let Some(App(start)) = terms.pop() else {
@@ -52,9 +52,9 @@ impl Term {
 						continue;
 					}
 
-					break
+					break;
 				}
-			}	
+			}
 		}
 	}
 
@@ -221,9 +221,10 @@ impl std::fmt::Display for Term {
 }
 
 fn new_var_where(mut p: impl FnMut(&'static str) -> bool) -> Option<&'static str> {
-	let options: [&'static str; 26] = [
+	let options = [
 		"a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r",
-		"s", "t", "u", "v", "w", "x", "y", "z",
+		"s", "t", "u", "v", "w", "x", "y", "z", "α", "β", "γ", "δ", "ε", "ζ", "η", "θ", "ι", "κ",
+		"λ", "μ", "ν", "ξ", "ο", "π", "ρ", "ς", "τ", "υ", "φ", "χ", "ψ", "ω",
 	];
 
 	options.into_iter().find(|&s| p(s))

@@ -1,16 +1,17 @@
 use std::collections::HashSet;
 
+#[derive(Clone, Debug)]
 pub enum Type {
-	Int,
-	Var(char),
+	Nat,
+	Var(&'static str),
 	Fun(Box<Type>, Box<Type>),
 }
 
 impl Type {
-	pub fn free_vars(&self) -> HashSet<char> {
+	pub fn free_vars(&self) -> HashSet<&'static str> {
 		use Type::*;
 		match &self {
-			Int => HashSet::new(),
+			Nat => HashSet::new(),
 			Var(c) => HashSet::from([*c]),
 			Fun(l, r) => {
 				let l = l.free_vars();
@@ -19,20 +20,4 @@ impl Type {
 			}
 		}
 	}
-}
-
-#[macro_export]
-macro_rules! ty {
-	(N) => {
-		Type::Int
-	};
-	($x:literal) => {
-		Type::Var($x)
-	};
-	(($a:tt) -> ($b:tt)) => {
-		Type::Fun(ty!($a), ty!($b))
-	};
-	(($r:tt)) => {
-		ty!($r)
-	};
 }
