@@ -44,13 +44,8 @@ impl Term {
 						continue;
 					}
 
-					if !self.head_red() {
-						continue;
-					}
-
-					if !self.beta() {
-						continue;
-					}
+					self.hnf();
+					self.normalize();
 
 					break;
 				}

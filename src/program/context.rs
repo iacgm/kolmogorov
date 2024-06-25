@@ -54,7 +54,7 @@ impl Context {
 				let func = func.clone();
 
 				for arg in &mut terms[index..] {
-					arg.exec(self);
+					self.solve(arg);
 				}
 
 				let output = func(&mut terms[index..]);
@@ -63,6 +63,20 @@ impl Context {
 				true
 			}
 			_ => false,
+		}
+	}
+
+	//Reduce to a head normal form. This does not reduce completely,
+	pub fn solve(&mut self, term: &mut Term) {
+		use Term::*;
+		loop {
+			term.hnf();
+			match term {
+				App(terms) => if !self.reduce(terms) {
+					break
+				},
+				_ => break,
+			}
 		}
 	}
 }

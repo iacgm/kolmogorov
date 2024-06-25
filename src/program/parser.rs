@@ -27,14 +27,25 @@ macro_rules! term {
 
 #[macro_export]
 macro_rules! literal {
-	($($ty:tt)=>* [$($arg:ident),+] => $body:expr) => {{
+	(
+		$(forall $($a:ident)+)? :: $($ty:tt)=>+
+		$(using [$($captured:ident),+] in)?
+		|$($arg:ident),+| => $body:expr
+	) => {{
 		use $crate::*;
+
+		let ty = ty!($(forall $($a)+ :)? $($ty)=>+);
+
 		let n_args = count!($($arg)+);
+
+		$($(
+			let $captured = $captured.clone();
+		)+)?
 
 		ContextEntry {
 			active: true,
 			n_args,
-			ty: ty!($($ty)=>+),
+			ty,
 			func: std::rc::Rc::new(move |_args| {
 				let i = 1;
 				let rev_list!([$($arg),+]) = &mut _args[..] else {
@@ -42,7 +53,7 @@ macro_rules! literal {
 				};
 
 				$(
-					let $arg = std::mem::replace($arg, Num(0));
+					let $arg = std::mem::replace($arg, $crate::Term::Num(0));
 				)+ 
 
 				$body
@@ -58,6 +69,15 @@ macro_rules! ty {
 	};
 	($x:ident) => {
 		$crate::Type::Var(stringify!($x))
+	};
+	(forall $a:ident : $($b:tt)*) => {
+		$crate::Type::All(stringify!($a), ty!($($b)*).into())
+	};
+	(forall $a:ident $($as:ident)+ : $($b:tt)*) => {
+		$crate::Type::All(stringify!($a), ty!(forall $($as)+ : $($b)*).into())
+	};
+	([$a:tt]) => {
+		ty!(_v => ($a => _v => _v) => _v)
 	};
 	($a:tt => $($b:tt)+) => {
 		$crate::Type::Fun(ty!($a).into(), ty!($($b)+).into())
