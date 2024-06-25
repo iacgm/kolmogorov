@@ -3,7 +3,7 @@ use kolmogorov::*;
 fn main() {
 	use Term::*;
 
-	let fix = literal!{
+	let fix = literal! {
 		forall a :: (a => a) => a
 		|f| => term!([f] (fix [f]))
 	};
@@ -12,25 +12,20 @@ fn main() {
 
 	let ones = term!(fix ([cons] 1));
 
-	let empty = literal!{
+	let empty = literal! {
 		forall a b :: [a] => (b => b => b)
-		|l| => {
-			match l {
-				Var("nil") => term!(a b -> a),
-				_ => term!(a b -> b),
-			}
+		|l| => 	match l {
+			Var("nil") => term!(a b -> a),
+			_ => term!(a b -> b),
 		}
+
 	};
 
 	let mut test = term!(empty [ones]);
-	
-	let mut context = Context::new(&[
-		("fix", fix),
-		("non_empty", empty),
-	]);
+
+	let mut context = Context::new(&[("fix", fix), ("empty", empty)]);
 
 	test.exec(&mut context);
 
 	println!("Final result: {}", test);
-
 }
