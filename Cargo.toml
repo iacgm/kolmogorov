@@ -9,3 +9,6 @@ edition = "2021"
 
 [[example]]
 name="list"
+
+[[example]]
+name="fix"

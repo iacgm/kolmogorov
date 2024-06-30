@@ -3,7 +3,7 @@ macro_rules! term {
 	($x: ident) => {
 		$crate::Term::Var(stringify!($x))
 	};
-	([$x: ident]) => {
+	([$x: expr]) => {
 		$x.clone()
 	};
 	($x: literal) => {
@@ -26,7 +26,7 @@ macro_rules! term {
 }
 
 #[macro_export]
-macro_rules! literal {
+macro_rules! builtin {
 	(
 		$(forall $($a:ident)+)? :: $($ty:tt)=>+
 		$(using [$($captured:ident),+] in)?
@@ -34,7 +34,7 @@ macro_rules! literal {
 	) => {{
 		use $crate::*;
 
-		let ty = ty!($(forall $($a)+ :)? $($ty)=>+);
+		let ty = ty!($(forall $($a)+ ::)? $($ty)=>+);
 
 		let n_args = count!($($arg)+);
 
@@ -47,7 +47,6 @@ macro_rules! literal {
 			n_args,
 			ty,
 			func: std::rc::Rc::new(move |_args| {
-				let i = 1;
 				let rev_list!([$($arg),+]) = &mut _args[..] else {
 					unreachable!()
 				};
@@ -65,22 +64,28 @@ macro_rules! literal {
 #[macro_export]
 macro_rules! ty {
 	(N) => {
-		$crate::Type::Nat
+		$crate::Type::Int
+	};
+	(Int) => {
+		$crate::Type::Int
+	};
+	(Bool) => {
+		ty!(forall _t :: _t => _t => _t)
 	};
 	($x:ident) => {
-		$crate::Type::Var(stringify!($x))
+		$crate::Type::Name(stringify!($x))
 	};
-	(forall $a:ident : $($b:tt)*) => {
-		$crate::Type::All(stringify!($a), ty!($($b)*).into())
+	(forall $a:ident :: $($b:tt)*) => {
+		$crate::Type::Poly(stringify!($a), ty!($($b)*).into())
 	};
-	(forall $a:ident $($as:ident)+ : $($b:tt)*) => {
-		$crate::Type::All(stringify!($a), ty!(forall $($as)+ : $($b)*).into())
+	(forall $a:ident $($as:ident)+ :: $($b:tt)*) => {
+		$crate::Type::Poly(stringify!($a), ty!(forall $($as)+ : $($b)*).into())
 	};
 	([$a:tt]) => {
-		ty!(_v => ($a => _v => _v) => _v)
+		ty!(forall _t :: _t => ($a => _t => _t) => _t)
 	};
 	($a:tt => $($b:tt)+) => {
-		$crate::Type::Fun(ty!($a).into(), ty!($($b)+).into())
+		$crate::Type::Func(ty!($a).into(), ty!($($b)+).into())
 	};
 	(($($r:tt)+)) => {
 		ty!($($r)+)
@@ -91,7 +96,7 @@ macro_rules! ty {
 #[macro_export]
 macro_rules! rev_list {
     ([] $($reversed:ident),*) => { 
-        [.., $($reversed),*]
+        [$($reversed),*]
     };
     ([$first:ident $(, $rest:ident)*] $($reversed:ident),*) => { 
         rev_list!([$($rest),*] $first $(,$reversed)*)

@@ -47,7 +47,7 @@ impl Context {
 				func,
 				active,
 				..
-			}) if *active && *n_args <= n => {			
+			}) if *active && *n_args <= n => {
 				terms.pop();
 				let index = n - n_args;
 

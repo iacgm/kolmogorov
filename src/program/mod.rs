@@ -22,6 +22,7 @@ impl Term {
 	pub fn exec(&mut self, context: &mut Context) {
 		use Term::*;
 		loop {
+			println!("{}!", self);
 			match self {
 				Num(_) | Var(_) => break,
 				Lam(v, b) => {
@@ -44,8 +45,13 @@ impl Term {
 						continue;
 					}
 
-					self.hnf();
-					self.normalize();
+					if !self.head_red() {
+						continue;
+					}
+					
+					if !self.beta() {
+						continue;
+					}
 
 					break;
 				}
@@ -57,10 +63,10 @@ impl Term {
 		use Term::*;
 		match self {
 			Var(x) if *x == var => *self = code,
-			Lam(x, b) => {
-				if *x == var {
-					let free = code.free_vars();
-					let new = new_var_where(|s| s != var && !free.contains(s)).unwrap();
+			Lam(x, b) if *x != var => {
+				let free = code.free_vars();
+				if free.contains(x) {
+					let new = new_var_where(|s| !free.contains(s)).unwrap();
 					b.sub(x, Var(new));
 					*x = new;
 				}
@@ -173,6 +179,28 @@ impl Term {
 			}
 		}
 		false
+	}
+
+	pub fn all_vars(&self) -> HashSet<&'static str> {
+		use Term::*;
+		match self {
+			Var(x) => HashSet::from([*x]),
+			Lam(x, b) => {
+				let mut vars = b.all_vars();
+				vars.insert(x);
+				vars
+			}
+			App(t) => {
+				let mut free = HashSet::new();
+				for f in t {
+					for v in f.all_vars() {
+						free.insert(v);
+					}
+				}
+				free
+			}
+			_ => HashSet::new(),
+		}
 	}
 
 	pub fn free_vars(&self) -> HashSet<&'static str> {

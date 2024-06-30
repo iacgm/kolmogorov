@@ -6,24 +6,24 @@ fn main() {
 	let t = term!(x y -> x);
 	let f = term!(x y -> y);
 
-	let head = literal!{
-		:: [a] => a
+	let head = builtin! {
+		forall a :: [a] => a
 		using [t] in
 		|l| => term!([l] [t])
 	};
 
-	let tail = literal!{
-		:: [a] => [a]
+	let tail = builtin! {
+		forall a :: [a] => [a]
 		using [f] in
 		|l| => term!([l] [f])
 	};
 
-	let cons = literal!{
-		:: a => [a] => [a]
+	let cons = builtin! {
+		forall a :: a => [a] => [a]
 		|h, t, f| => term!([f] [h] [t])
 	};
 
-	let sum = literal!{
+	let sum = builtin! {
 		:: N => N => N
 		|x, y| => {
 			match (x, y) {
@@ -33,8 +33,8 @@ fn main() {
 		}
 	};
 
-	let length = literal!{
-		:: [a] => N
+	let length = builtin! {
+		forall a :: [a] => N
 		|l| => {
 			match l {
 				Var("nil") => Num(0),
