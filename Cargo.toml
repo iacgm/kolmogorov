@@ -11,4 +11,4 @@ edition = "2021"
 name="list"
 
 [[example]]
-name="fix"
+name="sum"

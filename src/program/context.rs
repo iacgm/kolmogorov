@@ -2,28 +2,28 @@ use super::*;
 use std::collections::*;
 use std::rc::Rc;
 
-type BuiltIn = dyn Fn(&mut [Term]) -> Term;
+type BuiltIn = Rc<dyn Fn(&mut Context, &mut [Term]) -> Term>;
 
 #[derive(Clone)]
 pub struct ContextEntry {
 	pub n_args: usize,
-	pub func: Rc<BuiltIn>,
+	pub func: BuiltIn,
 	pub active: bool,
-	pub ty: Type,
+	pub ty: PolyType,
 }
 
 pub struct Context {
-	dict: HashMap<&'static str, ContextEntry>,
+	dict: HashMap<Ident, ContextEntry>,
 }
 
 impl Context {
-	pub fn new(idents: &[(&'static str, ContextEntry)]) -> Self {
+	pub fn new(idents: &[(Ident, ContextEntry)]) -> Self {
 		Self {
 			dict: HashMap::from_iter(idents.iter().cloned()),
 		}
 	}
 
-	pub fn set_active(&mut self, ident: &'static str, state: bool) {
+	pub fn set_active(&mut self, ident: Ident, state: bool) {
 		if let Some(entry) = self.dict.get_mut(ident) {
 			entry.active = state;
 		}
@@ -39,44 +39,24 @@ impl Context {
 			return false;
 		}
 
-		let n = terms.len()-1;
+		let n = terms.len() - 1;
 
 		match &self.dict.get(ident) {
 			Some(ContextEntry {
 				n_args,
 				func,
-				active,
+				active: true,
 				..
-			}) if *active && *n_args <= n => {
+			}) if *n_args <= n => {
 				terms.pop();
 				let index = n - n_args;
-
 				let func = func.clone();
-
-				for arg in &mut terms[index..] {
-					self.solve(arg);
-				}
-
-				let output = func(&mut terms[index..]);
+				let output = func(self, &mut terms[index..]);
 				terms.truncate(index);
 				terms.push(output);
 				true
 			}
 			_ => false,
-		}
-	}
-
-	//Reduce to a head normal form. This does not reduce completely,
-	pub fn solve(&mut self, term: &mut Term) {
-		use Term::*;
-		loop {
-			term.hnf();
-			match term {
-				App(terms) => if !self.reduce(terms) {
-					break
-				},
-				_ => break,
-			}
 		}
 	}
 }

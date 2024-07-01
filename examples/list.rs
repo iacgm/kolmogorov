@@ -9,34 +9,32 @@ fn main() {
 	let head = builtin! {
 		forall a :: [a] => a
 		using [t] in
-		|l| => term!([l] [t])
+		|_ctx, l| => term!([l] [t])
 	};
 
 	let tail = builtin! {
 		forall a :: [a] => [a]
 		using [f] in
-		|l| => term!([l] [f])
+		|_ctx, l| => term!([l] [f])
 	};
 
 	let cons = builtin! {
 		forall a :: a => [a] => [a]
-		|h, t, f| => term!([f] [h] [t])
+		|_ctx, h, t, f| => term!([f] [h] [t])
 	};
 
 	let sum = builtin! {
 		:: N => N => N
-		|x, y| => {
-			match (x, y) {
-				(Num(ref x), Num(ref y)) => Num(x+y),
-				_ => unimplemented!(),
-			}
+		|ctx, a, b| => match (a.exec(ctx), b.exec(ctx)) {
+			(Num(ref a), Num(ref b)) => Num(a+b),
+			_ => unimplemented!()
 		}
 	};
 
 	let length = builtin! {
 		forall a :: [a] => N
-		|l| => {
-			match l {
+		|ctx, l| => {
+			match l.solve(ctx) {
 				Var("nil") => Num(0),
 				_ => term!(sum 1 (length (tail [l]))),
 			}

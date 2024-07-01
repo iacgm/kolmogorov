@@ -8,21 +8,22 @@ pub use types::*;
 
 use std::collections::HashSet;
 
+pub type Ident = &'static str;
+
 #[derive(Clone)]
 pub enum Term {
 	Num(i32),
-	Var(&'static str),
-	Lam(&'static str, Box<Term>),
+	Var(Ident),
+	Lam(Ident, Box<Term>),
 	//Backwards representation of applications to facilitate
 	//pushing & popping from the front
 	App(Vec<Term>),
 }
 
 impl Term {
-	pub fn exec(&mut self, context: &mut Context) {
+	pub fn exec(&mut self, context: &mut Context) -> &mut Self {
 		use Term::*;
 		loop {
-			println!("{}!", self);
 			match self {
 				Num(_) | Var(_) => break,
 				Lam(v, b) => {
@@ -32,13 +33,23 @@ impl Term {
 					break;
 				}
 				App(terms) => {
-					if let [.., App(_)] = &terms[..] {
-						let Some(App(start)) = terms.pop() else {
-							unreachable!()
-						};
+					match &terms[..] {
+						[.., App(_)] => {
+							let Some(App(start)) = terms.pop() else {
+								unreachable!()
+							};
 
-						terms.extend(start);
-						continue;
+							terms.extend(start);
+							continue;
+						}
+						[_] => {
+							let Some(inner) = terms.pop() else {
+								unreachable!()
+							};
+							*self = inner;
+							continue;
+						}
+						_ => (),
 					}
 
 					if context.reduce(terms) {
@@ -48,18 +59,42 @@ impl Term {
 					if !self.head_red() {
 						continue;
 					}
-					
+
 					if !self.beta() {
 						continue;
+					}
+
+					let App(terms) = self else { unreachable!() };
+
+					for term in terms.iter_mut().rev() {
+						term.exec(context);
 					}
 
 					break;
 				}
 			}
 		}
+
+		self
 	}
 
-	pub fn sub(&mut self, var: &'static str, code: Term) {
+	pub fn solve(&mut self, context: &mut Context) -> &mut Self {
+		use Term::*;
+		loop {
+			self.hnf();
+			match self {
+				App(terms) => {
+					if !context.reduce(terms) {
+						break;
+					}
+				}
+				_ => break,
+			}
+		}
+		self
+	}
+
+	pub fn sub(&mut self, var: Ident, code: Term) {
 		use Term::*;
 		match self {
 			Var(x) if *x == var => *self = code,
@@ -181,29 +216,7 @@ impl Term {
 		false
 	}
 
-	pub fn all_vars(&self) -> HashSet<&'static str> {
-		use Term::*;
-		match self {
-			Var(x) => HashSet::from([*x]),
-			Lam(x, b) => {
-				let mut vars = b.all_vars();
-				vars.insert(x);
-				vars
-			}
-			App(t) => {
-				let mut free = HashSet::new();
-				for f in t {
-					for v in f.all_vars() {
-						free.insert(v);
-					}
-				}
-				free
-			}
-			_ => HashSet::new(),
-		}
-	}
-
-	pub fn free_vars(&self) -> HashSet<&'static str> {
+	pub fn free_vars(&self) -> HashSet<Ident> {
 		use Term::*;
 		match self {
 			Var(x) => HashSet::from([*x]),
@@ -243,7 +256,7 @@ impl std::fmt::Display for Term {
 	}
 }
 
-fn new_var_where(mut p: impl FnMut(&'static str) -> bool) -> Option<&'static str> {
+fn new_var_where(mut p: impl FnMut(Ident) -> bool) -> Option<Ident> {
 	let options = [
 		"a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r",
 		"s", "t", "u", "v", "w", "x", "y", "z", "α", "β", "γ", "δ", "ε", "ζ", "η", "θ", "ι", "κ",

@@ -30,9 +30,10 @@ macro_rules! builtin {
 	(
 		$(forall $($a:ident)+)? :: $($ty:tt)=>+
 		$(using [$($captured:ident),+] in)?
-		|$($arg:ident),+| => $body:expr
+		|$ctx: ident, $($arg:ident),+| => $body:expr
 	) => {{
 		use $crate::*;
+		use std::rc::Rc;
 
 		let ty = ty!($(forall $($a)+ ::)? $($ty)=>+);
 
@@ -42,63 +43,70 @@ macro_rules! builtin {
 			let $captured = $captured.clone();
 		)+)?
 
+		let func = Rc::new(move |$ctx: &mut Context, _args: &mut [Term]| {
+			let rev_list!([$($arg),+]) = &mut _args[..] else {
+				unreachable!()
+			};
+
+			$(
+				let mut $arg = std::mem::replace($arg, $crate::Term::Num(0));
+			)+
+
+			$body
+		});
+
 		ContextEntry {
-			active: true,
 			n_args,
 			ty,
-			func: std::rc::Rc::new(move |_args| {
-				let rev_list!([$($arg),+]) = &mut _args[..] else {
-					unreachable!()
-				};
-
-				$(
-					let $arg = std::mem::replace($arg, $crate::Term::Num(0));
-				)+ 
-
-				$body
-			})
+			func,
+			active: true,
 		}
 	}}
 }
 
 #[macro_export]
 macro_rules! ty {
-	(N) => {
-		$crate::Type::Int
-	};
-	(Int) => {
-		$crate::Type::Int
-	};
+	(N) => {{
+		use $crate::*;
+		PolyType::from(MonoType::Int)
+	}};
+	(Int) => {{
+		use $crate::*;
+		PolyType::from(MonoType::Int)
+	}};
 	(Bool) => {
 		ty!(forall _t :: _t => _t => _t)
 	};
-	($x:ident) => {
-		$crate::Type::Name(stringify!($x))
-	};
-	(forall $a:ident :: $($b:tt)*) => {
-		$crate::Type::Poly(stringify!($a), ty!($($b)*).into())
-	};
-	(forall $a:ident $($as:ident)+ :: $($b:tt)*) => {
-		$crate::Type::Poly(stringify!($a), ty!(forall $($as)+ : $($b)*).into())
-	};
+	($x:ident) => {{
+		use $crate::*;
+		PolyType::from(MonoType::Name(stringify!($x)))
+	}};
+	(forall $($args:ident)+ :: $($b:tt)*) => {{
+		let mut poly = ty!($($b)*);
+		$(
+			poly.vars.insert(stringify!($args));
+		)+
+		poly
+	}};
 	([$a:tt]) => {
 		ty!(forall _t :: _t => ($a => _t => _t) => _t)
 	};
-	($a:tt => $($b:tt)+) => {
-		$crate::Type::Func(ty!($a).into(), ty!($($b)+).into())
-	};
+	($a:tt => $($b:tt)+) => {{
+		let mut from = ty!($a);
+		let to = ty!($($b)+);
+		$crate::PolyType::func(from, to)
+	}};
 	(($($r:tt)+)) => {
 		ty!($($r)+)
 	};
 }
 
-
 #[macro_export]
 macro_rules! rev_list {
-    ([] $($reversed:ident),*) => { 
+    ([] $($reversed:ident),*) => {
         [$($reversed),*]
     };
-    ([$first:ident $(, $rest:ident)*] $($reversed:ident),*) => { 
+    ([$first:ident $(, $rest:ident)*] $($reversed:ident),*) => {
         rev_list!([$($rest),*] $first $(,$reversed)*)
     };
 }

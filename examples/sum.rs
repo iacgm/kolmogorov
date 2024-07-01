@@ -8,68 +8,68 @@ fn main() {
 
 	let fix = builtin! {
 		forall a :: (a => a) => a
-		|f| => term!([f] (fix [f]))
+		|_ctx, f| => term!([f] (fix [f]))
 	};
 
 	let nil = term!(c n -> n);
 
 	let cons = builtin! {
 		forall a :: a => [a] => [a]
-		|h, t| => term!(c n -> c [h] ([t] c n))
+		|_ctx, h, t| => term!(c n -> c [h] ([t] c n))
 	};
 
 	let head = builtin! {
 		forall a :: [a]
-		|l| => term!([l] (h t -> h) (a b -> b))
+		|_ctx, l| => term!([l] (h t -> h) (a b -> b))
 	};
 
 	let tail = builtin! {
 		forall a :: [a] => [a]
-		|l| => term!(c n -> [l] (h t g -> g h (t c)) (t -> n) (h t -> t))
+		|_ctx, l| => term!(c n -> [l] (h t g -> g h (t c)) (t -> n) (h t -> t))
 	};
 
 	let isnil = builtin! {
 		forall a :: [a] => Bool
 		using [tr, fl] in
-		|l| => term!([l] (h t -> [fl]) [tr])
+		|_ctx, l| => term!([l] (h t -> [fl]) [tr])
 	};
 
 	let pred = builtin! {
 		:: N => N
-		|n| => match n {
+		|ctx, n| => match *n.exec(ctx) {
 			Num(n) => Num(n-1),
 			_ => unimplemented!(),
 		}
 	};
 
 	let take = builtin! {
-		:: N => Bool
+		forall a :: N => [a] => [a]
 		using [nil] in
-		|n| => match n {
-			Num(0) => term!(l -> [nil]),
-			_ => term!(l -> cons (head l) (take (pred [n]) (tail l)))
+		|ctx, n, l| => match n.exec(ctx) {
+			Num(0) => nil.clone(),
+			_ => term!(cons (head [l]) (take (pred [n]) (tail [l])))
 		}
 	};
 
 	let mul = builtin! {
-		:: N => N
-		|a, b| => match (a, b) {
-			(Num(a), Num(b)) => Num(a*b),
+		:: N => N => N
+		|ctx, a, b| => match (a.exec(ctx), b.exec(ctx)) {
+			(Num(ref a), Num(ref b)) => Num(a*b),
 			_ => unimplemented!()
 		}
 	};
 
 	let add = builtin! {
-		:: N => N
-		|a, b| => match (a, b) {
-			(Num(a), Num(b)) => Num(a+b),
+		:: N => N => N
+		|ctx, a, b| => match (a.exec(ctx), b.exec(ctx)) {
+			(Num(ref a), Num(ref b)) => Num(a+b),
 			_ => unimplemented!()
 		}
 	};
 
 	let fact = builtin! {
 		:: N => N
-		|n| => match n {
+		|ctx, n| => match n.exec(ctx) {
 			Num(0) => Num(1),
 			_ => term!(mul [n] (fact (pred [n]))),
 		}
@@ -85,7 +85,7 @@ fn main() {
 		l
 	};
 
-	let ints = term!(fix (cons 1));//make_list(&[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+	let ints = make_list(&[0,1,2,3,4,5,6,7,8,9]);
 
 	let mut list = term!([sum_up] (take 5 [ints]));
 
