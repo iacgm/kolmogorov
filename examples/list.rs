@@ -41,7 +41,7 @@ fn main() {
 		}
 	};
 
-	let mut context = Context::new(&[
+	let mut context = Dictionary::new(&[
 		("sum", sum),
 		("length", length),
 		("head", head),

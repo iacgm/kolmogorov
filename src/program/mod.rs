@@ -1,27 +1,27 @@
-pub mod context;
+pub mod dictionary;
 pub mod parser;
 pub mod types;
 
-pub use context::*;
+pub use dictionary::*;
 pub use parser::*;
 pub use types::*;
 
 use std::collections::HashSet;
 
-pub type Ident = &'static str;
+pub type Identifier = &'static str;
 
 #[derive(Clone)]
 pub enum Term {
 	Num(i32),
-	Var(Ident),
-	Lam(Ident, Box<Term>),
+	Var(Identifier),
+	Lam(Identifier, Box<Term>),
 	//Backwards representation of applications to facilitate
 	//pushing & popping from the front
 	App(Vec<Term>),
 }
 
 impl Term {
-	pub fn exec(&mut self, context: &mut Context) -> &mut Self {
+	pub fn exec(&mut self, context: &mut Dictionary) -> &mut Self {
 		use Term::*;
 		loop {
 			match self {
@@ -78,7 +78,7 @@ impl Term {
 		self
 	}
 
-	pub fn solve(&mut self, context: &mut Context) -> &mut Self {
+	pub fn solve(&mut self, context: &mut Dictionary) -> &mut Self {
 		use Term::*;
 		loop {
 			self.hnf();
@@ -94,7 +94,7 @@ impl Term {
 		self
 	}
 
-	pub fn sub(&mut self, var: Ident, code: Term) {
+	pub fn sub(&mut self, var: Identifier, code: Term) {
 		use Term::*;
 		match self {
 			Var(x) if *x == var => *self = code,
@@ -216,7 +216,7 @@ impl Term {
 		false
 	}
 
-	pub fn free_vars(&self) -> HashSet<Ident> {
+	pub fn free_vars(&self) -> HashSet<Identifier> {
 		use Term::*;
 		match self {
 			Var(x) => HashSet::from([*x]),
@@ -256,7 +256,7 @@ impl std::fmt::Display for Term {
 	}
 }
 
-fn new_var_where(mut p: impl FnMut(Ident) -> bool) -> Option<Ident> {
+fn new_var_where(mut p: impl FnMut(Identifier) -> bool) -> Option<Identifier> {
 	let options = [
 		"a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r",
 		"s", "t", "u", "v", "w", "x", "y", "z", "α", "β", "γ", "δ", "ε", "ζ", "η", "θ", "ι", "κ",

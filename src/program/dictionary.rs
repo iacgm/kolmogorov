@@ -2,29 +2,29 @@ use super::*;
 use std::collections::*;
 use std::rc::Rc;
 
-type BuiltIn = Rc<dyn Fn(&mut Context, &mut [Term]) -> Term>;
+type BuiltIn = Rc<dyn Fn(&mut Dictionary, &mut [Term]) -> Term>;
 
 #[derive(Clone)]
-pub struct ContextEntry {
+pub struct Definition {
 	pub n_args: usize,
 	pub func: BuiltIn,
 	pub active: bool,
 	pub ty: PolyType,
 }
 
-pub struct Context {
-	dict: HashMap<Ident, ContextEntry>,
+pub struct Dictionary {
+	defs: HashMap<Identifier, Definition>,
 }
 
-impl Context {
-	pub fn new(idents: &[(Ident, ContextEntry)]) -> Self {
+impl Dictionary {
+	pub fn new(idents: &[(Identifier, Definition)]) -> Self {
 		Self {
-			dict: HashMap::from_iter(idents.iter().cloned()),
+			defs: HashMap::from_iter(idents.iter().cloned()),
 		}
 	}
-
-	pub fn set_active(&mut self, ident: Ident, state: bool) {
-		if let Some(entry) = self.dict.get_mut(ident) {
+	
+	pub fn set_active(&mut self, ident: Identifier, state: bool) {
+		if let Some(entry) = self.defs.get_mut(ident) {
 			entry.active = state;
 		}
 	}
@@ -41,8 +41,8 @@ impl Context {
 
 		let n = terms.len() - 1;
 
-		match &self.dict.get(ident) {
-			Some(ContextEntry {
+		match &self.defs.get(ident) {
+			Some(Definition {
 				n_args,
 				func,
 				active: true,

@@ -6,7 +6,7 @@ fn main() {
 
 	let mut prog = term!([cons] 2 ([cons] 1 [nil]) f n);
 
-	println!("{}", prog);
+	println!(">{}", prog);
 	prog.normalize();
-	println!("{}", prog);
+	println!(">{}", prog);
 }

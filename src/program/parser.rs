@@ -43,7 +43,7 @@ macro_rules! builtin {
 			let $captured = $captured.clone();
 		)+)?
 
-		let func = Rc::new(move |$ctx: &mut Context, _args: &mut [Term]| {
+		let func = Rc::new(move |$ctx: &mut Dictionary, _args: &mut [Term]| {
 			let rev_list!([$($arg),+]) = &mut _args[..] else {
 				unreachable!()
 			};
@@ -55,7 +55,7 @@ macro_rules! builtin {
 			$body
 		});
 
-		ContextEntry {
+		Definition {
 			n_args,
 			ty,
 			func,
@@ -79,7 +79,10 @@ macro_rules! ty {
 	};
 	($x:ident) => {{
 		use $crate::*;
-		PolyType::from(MonoType::Name(stringify!($x)))
+		PolyType {
+			vars: Default::default(),
+			mono: MonoType::Var(stringify!($x)),
+		}
 	}};
 	(forall $($args:ident)+ :: $($b:tt)*) => {{
 		let mut poly = ty!($($b)*);

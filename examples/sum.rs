@@ -89,7 +89,7 @@ fn main() {
 
 	let mut list = term!([sum_up] (take 5 [ints]));
 
-	let mut context = Context::new(&[
+	let mut context = Dictionary::new(&[
 		("isnil", isnil),
 		("tail", tail),
 		("head", head),
