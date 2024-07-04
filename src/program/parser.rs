@@ -66,14 +66,12 @@ macro_rules! builtin {
 
 #[macro_export]
 macro_rules! ty {
-	(N) => {{
-		use $crate::*;
-		PolyType::from(MonoType::Int)
-	}};
-	(Int) => {{
-		use $crate::*;
-		PolyType::from(MonoType::Int)
-	}};
+	(N) => {
+		$crate::MonoType::Int.poly()
+	};
+	(Int) => {
+		$crate::MonoType::Int.poly()
+	};
 	(Bool) => {
 		ty!(forall _t :: _t => _t => _t)
 	};

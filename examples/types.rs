@@ -5,6 +5,9 @@ fn main() {
 	let inst = &ty!((N => N) => (N => N) => (N => N)).mono;
 	let diff = &ty!((b => c) => (a => b) => (a => c)).mono; 
 
-	println!("{} <:? {}: {}", inst, base, base.matches(inst));
-	println!("{} <:? {}: {}", diff, base, base.matches(diff));
+	println!("{} <:? {}: {}", inst, base, base.instantiates(inst));
+	println!("{} <:? {}: {}", diff, base, base.instantiates(diff));
+
+	println!("{} unify {}: {:?}", base, inst, diff.unify(inst));
+	println!("{} unify {}: {:?}", base, inst, diff.unify(inst));
 }

@@ -8,6 +8,8 @@ pub use mono::*;
 
 use super::*;
 
+pub type TypeSub = HashMap<Identifier, MonoType>;
+
 #[derive(Clone, Debug)]
 pub struct PolyType {
 	pub vars: HashSet<Identifier>,
@@ -15,7 +17,7 @@ pub struct PolyType {
 }
 
 impl PolyType {
-	pub fn matches(&self, mono: &MonoType) -> bool {
+	pub fn instantiates(&self, mono: &MonoType) -> bool {
 		use MonoType::*;
 
 		let free = &self.vars;
@@ -83,14 +85,5 @@ impl std::fmt::Display for PolyType {
 		}
 
 		write!(f, "{}", self.mono)
-	}
-}
-
-impl From<MonoType> for PolyType {
-	fn from(mono: MonoType) -> Self {
-		Self {
-			vars: mono.free_vars(),
-			mono,
-		}
 	}
 }
