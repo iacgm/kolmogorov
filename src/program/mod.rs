@@ -27,9 +27,10 @@ impl Term {
 			match self {
 				Num(_) | Var(_) => break,
 				Lam(v, b) => {
-					context.set_active(v, false);
+					//Ensure v is treated as free
+					context.shadow(v);
 					b.exec(context);
-					context.set_active(v, true);
+					context.unshadow(v);
 					break;
 				}
 				App(terms) => {

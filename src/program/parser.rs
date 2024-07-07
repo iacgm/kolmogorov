@@ -35,7 +35,7 @@ macro_rules! builtin {
 		use $crate::*;
 		use std::rc::Rc;
 
-		let ty = ty!($(forall $($a)+ ::)? $($ty)=>+);
+		let ty = poly!($(forall $($a)+)? :: $($ty)=>+);
 
 		let n_args = count!($($arg)+);
 
@@ -55,50 +55,39 @@ macro_rules! builtin {
 			$body
 		});
 
-		Definition {
+		(BuiltIn {
 			n_args,
-			ty,
 			func,
-			active: true,
-		}
+		}.into(), ty)
 	}}
 }
 
 #[macro_export]
-macro_rules! ty {
+macro_rules! poly {
+	($(forall $($t:ident)+)? :: $($b:tt)+) => {
+		$crate::PolyType {
+			vars: std::collections::HashSet::from([$($(stringify!($t)),+)?]),
+			mono: $crate::mono!($($b)+)
+		}
+	};
+}
+
+#[macro_export]
+macro_rules! mono {
 	(N) => {
-		$crate::MonoType::Int.poly()
+		$crate::MonoType::Int
 	};
 	(Int) => {
-		$crate::MonoType::Int.poly()
+		$crate::MonoType::Int
 	};
-	(Bool) => {
-		ty!(forall _t :: _t => _t => _t)
+	($x: ident) => {
+		$crate::MonoType::Var(stringify!($x))
 	};
-	($x:ident) => {{
-		use $crate::*;
-		PolyType {
-			vars: Default::default(),
-			mono: MonoType::Var(stringify!($x)),
-		}
-	}};
-	(forall $($args:ident)+ :: $($b:tt)*) => {{
-		let mut poly = ty!($($b)*);
-		$(
-			poly.vars.insert(stringify!($args));
-		)+
-		poly
-	}};
-	([$a:tt]) => {
-		ty!(forall _t :: _t => ($a => _t => _t) => _t)
+	($a:tt => $($b:tt)+) => {
+		$crate::MonoType::Fun(mono!($a).into(), mono!($($b)+).into())
 	};
-	($a:tt => $($b:tt)+) => {{
-		let mut from = ty!($a);
-		let to = ty!($($b)+);
-		$crate::PolyType::func(from, to)
-	}};
 	(($($r:tt)+)) => {
-		ty!($($r)+)
+		mono!($($r)+)
 	};
 }
 
