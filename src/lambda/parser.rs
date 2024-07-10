@@ -28,7 +28,7 @@ macro_rules! term {
 #[macro_export]
 macro_rules! builtin {
 	(
-		$(forall $($a:ident)+)? :: $($ty:tt)=>+
+		$($ty:tt)=>+
 		$(using [$($captured:ident),+] in)?
 		|$ctx: ident, $($arg:ident),+| => $body:expr
 	) => {{
@@ -63,31 +63,21 @@ macro_rules! builtin {
 }
 
 #[macro_export]
-macro_rules! poly {
-	($(forall $($t:ident)+)? :: $($b:tt)+) => {
-		$crate::PolyType {
-			vars: std::collections::HashSet::from([$($(stringify!($t)),+)?]),
-			mono: $crate::mono!($($b)+)
-		}
-	};
-}
-
-#[macro_export]
-macro_rules! mono {
+macro_rules! ty {
 	(N) => {
-		$crate::MonoType::Int
+		$crate::Type::Int
 	};
 	(Int) => {
-		$crate::MonoType::Int
+		$crate::Type::Int
 	};
 	($x: ident) => {
-		$crate::MonoType::Var(stringify!($x))
+		$crate::Type::Var(stringify!($x))
 	};
 	($a:tt => $($b:tt)+) => {
-		$crate::MonoType::Fun(mono!($a).into(), mono!($($b)+).into())
+		$crate::Type::Fun(ty!($a).into(), ty!($($b)+).into())
 	};
 	(($($r:tt)+)) => {
-		mono!($($r)+)
+		ty!($($r)+)
 	};
 }
 

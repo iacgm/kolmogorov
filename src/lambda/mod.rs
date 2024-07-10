@@ -1,14 +1,14 @@
 pub mod dictionary;
 pub mod parser;
 pub mod types;
+mod vars;
 
 pub use dictionary::*;
 pub use parser::*;
 pub use types::*;
 
+use vars::*;
 use std::collections::HashSet;
-
-pub type Identifier = &'static str;
 
 #[derive(Clone)]
 pub enum Term {
@@ -255,14 +255,4 @@ impl std::fmt::Display for Term {
 			}
 		}
 	}
-}
-
-fn new_var_where(mut p: impl FnMut(Identifier) -> bool) -> Option<Identifier> {
-	let options = [
-		"a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r",
-		"s", "t", "u", "v", "w", "x", "y", "z", "α", "β", "γ", "δ", "ε", "ζ", "η", "θ", "ι", "κ",
-		"λ", "μ", "ν", "ξ", "ο", "π", "ρ", "ς", "τ", "υ", "φ", "χ", "ψ", "ω",
-	];
-
-	options.into_iter().find(|&s| p(s))
 }

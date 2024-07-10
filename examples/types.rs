@@ -1,18 +1,15 @@
 use kolmogorov::*;
 
 fn main() {
-	let base = poly!(forall a b c :: (a => b) => (b => c) => (a => c));
-	let inst = mono!((N => y) => (x => N) => (x => y));
-	let diff = mono!((b => c) => (a => b) => (a => c));
-
-	println!("{} <:? {}: {}", inst, base, base.instantiates(&inst));
-	println!("{} <:? {}: {}", diff, base, base.instantiates(&diff));
+	let base = ty!((a => b) => (b => c) => (a => c));
+	let inst = ty!((N => y) => (x => N) => (x => y));
+	let diff = ty!((b => c) => (a => b) => (a => c));
 
 	let mut sub = TypeSub::default();
 	dbg!(sub.unify(&diff, &inst));
 	
 	let mut unified = diff.clone();
-	sub.to_mono(&mut unified);
+	sub.apply(&mut unified);
 
 	println!("{} unify {}: \n\t{:?}\n\tyielding:\n\t{}", base, inst, sub, unified);
 

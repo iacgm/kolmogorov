@@ -3,16 +3,16 @@ use std::collections::HashMap;
 
 #[derive(Default, Debug)]
 pub struct TypeSub {
-	dict: HashMap<Identifier, MonoType>,
+	dict: HashMap<Identifier, Type>,
 }
 
 impl TypeSub {
-	pub fn unify(&mut self, lhs: &MonoType, rhs: &MonoType) -> bool {
-		use MonoType::*;
+	pub fn unify(&mut self, lhs: &Type, rhs: &Type) -> bool {
+		use Type::*;
 
-		type RefSub<'a> = HashMap<Identifier, &'a MonoType>;
+		type RefSub<'a> = HashMap<Identifier, &'a Type>;
 
-		fn contains(sub: &RefSub, s: Identifier, t: &MonoType) -> bool {
+		fn contains(sub: &RefSub, s: Identifier, t: &Type) -> bool {
 			match t {
 				Int => false,
 				Var(v) if *v == s => true,
@@ -70,19 +70,19 @@ impl TypeSub {
 		true
 	}
 
-	pub fn to_mono(&self, mono: &mut MonoType) {
-		use MonoType::*;
-		match mono {
+	pub fn apply(&self, ty: &mut Type) {
+		use Type::*;
+		match ty {
 			Int => (),
 			Var(v) => {
-				if let Some(ty) = self.dict.get(v) {
-					*mono = ty.clone();
-					self.to_mono(mono);
+				if let Some(new) = self.dict.get(v) {
+					*ty = new.clone();
+					self.apply(ty);
 				}
 			}
 			Fun(l, r) => {
-				self.to_mono(l);
-				self.to_mono(r);
+				self.apply(l);
+				self.apply(r);
 			}
 		}
 	}

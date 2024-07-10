@@ -16,7 +16,7 @@ pub enum Value {
 	BuiltIn(BuiltIn),
 }
 
-type Definition = (Value, PolyType);
+type Definition = (Value, Type);
 
 type Entry = Option<Definition>;
 
@@ -26,13 +26,16 @@ pub struct Dictionary {
 
 impl Dictionary {
 	//Infers principal type of term
-	pub fn infer(&self, term: &Term) -> Option<PolyType> {
-		use MonoType::*;
+	pub fn infer(&self, term: &Term) -> Option<Type> {
+		use Type::*;
 
-		type Defs = HashMap<Identifier, MonoType>;
+		type Defs = HashMap<Identifier, Type>;
 
-		fn core(params: (&Dictionary, &mut TypeSub, &mut Defs), term: &Term) -> Option<MonoType> {
-			let (dict, subs, defs) = params;
+		fn core(
+			params: (&Dictionary, &mut TypeSub, &mut Defs, &mut VarGen),
+			term: &Term,
+		) -> Option<Type> {
+			let (dict, subs, defs, vgen) = params;
 			match term {
 				Term::Num(_) => Some(Int),
 				Term::Var(v) => {
@@ -40,22 +43,24 @@ impl Dictionary {
 						return Some(mono.clone());
 					}
 
-					if let Some((_, poly)) = dict.query(v) {
-						return Some(poly.mono.clone());
+					if let Some((_, ty)) = dict.query(v) {
+						return Some(ty.clone());
 					}
 
 					None
 				}
 				Term::Lam(v, b) => {
-					let unused = |v| !dict.contains(v) && defs.values().all(|c| Var(v) != *c);
-					let newvar = new_var_where(unused).unwrap();
+					let newvar = vgen.newvar();
 
 					let mut tau = Var(newvar);
 					defs.insert(v, tau.clone());
-					let out = core((dict, subs, defs), b);
+
+					let params = (dict, &mut *subs, &mut *defs, &mut *vgen);
+					let out = core(params, b);
+
 					defs.remove(v);
 
-					subs.to_mono(&mut tau);
+					subs.apply(&mut tau);
 					let fun_ty = Fun(tau.into(), out?.into());
 
 					Some(fun_ty)
@@ -65,13 +70,14 @@ impl Dictionary {
 
 					let fst = terms.next().unwrap();
 
-					let mut lht = core((dict, subs, defs), fst)?;
+					let params = (dict, &mut *subs, &mut *defs, &mut *vgen);
+					let mut lht = core(params, fst)?;
 
 					for snd in terms {
-						let rht = core((dict, subs, defs), snd)?;
+						let params = (dict, &mut *subs, &mut *defs, &mut *vgen);
+						let rht = core(params, snd)?;
 
-						let unused = |v| !dict.contains(v) && defs.values().all(|c| Var(v) != *c);
-						let newvar = new_var_where(unused).unwrap();
+						let newvar = vgen.newvar();
 
 						let mut tau = Var(newvar);
 
@@ -81,7 +87,7 @@ impl Dictionary {
 							return None;
 						}
 
-						subs.to_mono(&mut tau);
+						subs.apply(&mut tau);
 						lht = tau;
 					}
 
@@ -91,10 +97,20 @@ impl Dictionary {
 		}
 
 		let mut subs = TypeSub::default();
-		let mut defs = Default::default();
-		let params = (self, &mut subs, &mut defs);
-		let poly = core(params, term)?.poly();
-		Some(poly)
+		let mut defs = Defs::default();
+		let mut vgen = VarGen::default();
+
+		for (var, entry) in &self.defs {
+			vgen.retire(var);
+			for (_, t) in entry.iter().filter_map(|o| o.as_ref()) {
+				for var in t.vars() {
+					vgen.retire(var)
+				}
+			}
+		}
+
+		let params = (self, &mut subs, &mut defs, &mut vgen);
+		core(params, term)
 	}
 
 	pub fn reduce(&mut self, terms: &mut Vec<Term>) -> bool {
@@ -133,26 +149,6 @@ impl Dictionary {
 		Self { defs: map }
 	}
 
-	pub fn newvar(&self) -> Identifier {
-		new_var_where(|t| !self.contains(t)).unwrap()
-	}
-
-	pub fn contains(&self, ident: Identifier) -> bool {
-		if self.defs.contains_key(ident) {
-			return true;
-		}
-
-		for v in self.defs.values().flatten() {
-			match v {
-				Some((_, ty)) if ty.contains(ident) => return true,
-				Some((Value::Term(t), _)) if t.free_vars().contains(&ident) => return true,
-				_ => (),
-			}
-		}
-
-		false
-	}
-
 	pub fn query(&self, ident: Identifier) -> Option<&Definition> {
 		let defs = self.defs.get(&ident)?;
 		defs.last()?.as_ref()
@@ -167,7 +163,7 @@ impl Dictionary {
 		self.defs.get_mut(&ident).unwrap().pop();
 	}
 
-	pub fn push_def(&mut self, ident: Identifier, term: Term, ty: PolyType) {
+	pub fn push_def(&mut self, ident: Identifier, term: Term, ty: Type) {
 		let def = Some((Value::Term(term), ty));
 		self.defs.entry(ident).or_default().push(def);
 	}

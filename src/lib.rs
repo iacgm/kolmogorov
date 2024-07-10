@@ -1,2 +1,2 @@
-pub mod program;
-pub use program::*;
+pub mod lambda;
+pub use lambda::*;
