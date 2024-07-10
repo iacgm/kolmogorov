@@ -61,7 +61,16 @@ impl Display for Type {
 		match self {
 			Int => write!(f, "N"),
 			Var(v) => write!(f, "{}", v),
-			Fun(x, y) => write!(f, "({}=>{})", x, y),
+			Fun(x, y) => {
+				write!(f, "({}", x)?;
+				let mut r = &**y;
+				while let Fun(t, next) = r {
+					write!(f, "=>{}", t)?;
+					r = &**next;
+				}
+				write!(f, "=>{}", r)?;
+				write!(f, ")")
+			}
 		}
 	}
 }

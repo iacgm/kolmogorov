@@ -1,5 +1,6 @@
 use kolmogorov::*;
 
+#[allow(non_snake_case)]
 fn main() {
 	let base = ty!((a => b) => (b => c) => (a => c));
 	let inst = ty!((N => y) => (x => N) => (x => y));
@@ -19,6 +20,9 @@ fn main() {
 	judge(&term!(a b -> a));
 	judge(&term!(f x -> f x));
 	judge(&term!(x -> x));
+
+	let K = term!(x y -> x);
+	judge(&term!(f x -> [K] (f x) (f 1)));
 }
 
 fn judge(term: &Term) {

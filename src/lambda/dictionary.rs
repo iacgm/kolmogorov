@@ -52,6 +52,8 @@ impl Dictionary {
 				Term::Lam(v, b) => {
 					let newvar = vgen.newvar();
 
+					let old = defs.remove(v);
+
 					let mut tau = Var(newvar);
 					defs.insert(v, tau.clone());
 
@@ -59,6 +61,10 @@ impl Dictionary {
 					let out = core(params, b);
 
 					defs.remove(v);
+
+					if let Some(old) = old {
+						defs.insert(v, old);
+					}
 
 					subs.apply(&mut tau);
 					let fun_ty = Fun(tau.into(), out?.into());
