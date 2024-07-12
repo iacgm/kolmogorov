@@ -2,11 +2,12 @@ use super::*;
 
 pub type Identifier = &'static str;
 
-const IDENTS: [Identifier; 76] = [
+//A few letters removed for legibility (N, omicron, nu, upsilon, )
+const IDENTS: &[Identifier] = &[
 	"a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s",
 	"t", "u", "v", "w", "x", "y", "z", "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L",
-	"M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z", "α", "β", "γ", "δ", "ε",
-	"ζ", "η", "θ", "ι", "κ", "λ", "μ", "ν", "ξ", "ο", "π", "ρ", "ς", "τ", "υ", "φ", "χ", "ψ", "ω",
+	"M", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z", "α", "β", "γ", "δ", "ε", "ζ",
+	"η", "θ", "ι", "κ", "λ", "μ", "ξ", "π", "ρ", "ς", "τ", "φ", "χ", "ψ", "ω",
 ];
 
 //Variable generator
@@ -18,6 +19,16 @@ pub struct VarGen {
 impl VarGen {
 	pub fn newvar(&mut self) -> Identifier {
 		let var = *self.free.iter().next().unwrap();
+		self.free.take(var).unwrap()
+	}
+
+	pub fn cap_var(&mut self) -> Identifier {
+		self.find_with(char::is_ascii_uppercase)
+	}
+
+	pub fn find_with(&mut self, p: impl Fn(&char) -> bool) -> Identifier {
+		let p = |s: &Identifier| p(&s.chars().next().unwrap());
+		let var = self.free.iter().copied().find(p).unwrap();
 		self.free.take(var).unwrap()
 	}
 
@@ -33,11 +44,11 @@ impl VarGen {
 impl Default for VarGen {
 	fn default() -> Self {
 		Self {
-			free: HashSet::from(IDENTS),
+			free: HashSet::from_iter(IDENTS.iter().copied()),
 		}
 	}
 }
 
 pub fn new_var_where(mut p: impl FnMut(Identifier) -> bool) -> Option<Identifier> {
-	IDENTS.into_iter().find(|&s| p(s))
+	IDENTS.iter().copied().find(|&s| p(s))
 }
