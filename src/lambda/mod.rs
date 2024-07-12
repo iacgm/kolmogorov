@@ -7,10 +7,10 @@ pub use dictionary::*;
 pub use parser::*;
 pub use types::*;
 
-use vars::*;
 use std::collections::HashSet;
+use vars::*;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Term {
 	Num(i32),
 	Var(Identifier),
@@ -21,64 +21,6 @@ pub enum Term {
 }
 
 impl Term {
-	pub fn exec(&mut self, context: &mut Dictionary) -> &mut Self {
-		use Term::*;
-		loop {
-			match self {
-				Num(_) | Var(_) => break,
-				Lam(v, b) => {
-					//Ensure v is treated as free
-					context.shadow(v);
-					b.exec(context);
-					context.unshadow(v);
-					break;
-				}
-				App(terms) => {
-					match &terms[..] {
-						[.., App(_)] => {
-							let Some(App(start)) = terms.pop() else {
-								unreachable!()
-							};
-
-							terms.extend(start);
-							continue;
-						}
-						[_] => {
-							let Some(inner) = terms.pop() else {
-								unreachable!()
-							};
-							*self = inner;
-							continue;
-						}
-						_ => (),
-					}
-
-					if context.reduce(terms) {
-						continue;
-					}
-
-					if !self.head_red() {
-						continue;
-					}
-
-					if !self.beta() {
-						continue;
-					}
-
-					let App(terms) = self else { unreachable!() };
-
-					for term in terms.iter_mut().rev() {
-						term.exec(context);
-					}
-
-					break;
-				}
-			}
-		}
-
-		self
-	}
-
 	pub fn solve(&mut self, context: &mut Dictionary) -> &mut Self {
 		use Term::*;
 		loop {
@@ -242,11 +184,21 @@ impl Term {
 
 impl std::fmt::Display for Term {
 	fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		use Term::*;
 		match self {
-			Self::Num(k) => write!(fmt, "{}", k),
-			Self::Var(v) => write!(fmt, "{}", v),
-			Self::Lam(v, b) => write!(fmt, "({}->{})", v, b),
-			Self::App(terms) => {
+			Num(k) => write!(fmt, "{}", k),
+			Var(v) => write!(fmt, "{}", v),
+			Lam(v, b) => {
+				write!(fmt, "(\\{}", v)?;
+				let mut r = &**b;
+				while let Lam(v, next) = r {
+					write!(fmt, " {}", v)?;
+					r = &**next;
+				}
+				write!(fmt, " -> {}", r)?;
+				write!(fmt, ")")
+			}
+			App(terms) => {
 				write!(fmt, "{}", terms.last().unwrap())?;
 				for term in terms[..terms.len() - 1].iter().rev() {
 					write!(fmt, "({})", term)?;

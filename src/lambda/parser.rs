@@ -30,12 +30,12 @@ macro_rules! builtin {
 	(
 		$($ty:tt)=>+
 		$(using [$($captured:ident),+] in)?
-		|$ctx: ident, $($arg:ident),+| => $body:expr
+		|$($arg:ident),+| => $body:expr
 	) => {{
 		use $crate::*;
 		use std::rc::Rc;
 
-		let ty = poly!($(forall $($a)+)? :: $($ty)=>+);
+		let ty = ty!($($ty)=>+);
 
 		let n_args = count!($($arg)+);
 
@@ -43,7 +43,7 @@ macro_rules! builtin {
 			let $captured = $captured.clone();
 		)+)?
 
-		let func = Rc::new(move |$ctx: &mut Dictionary, _args: &mut [Term]| {
+		let func = Rc::new(move |_args: &mut [Term]| {
 			let rev_list!([$($arg),+]) = &mut _args[..] else {
 				unreachable!()
 			};
@@ -55,10 +55,10 @@ macro_rules! builtin {
 			$body
 		});
 
-		(BuiltIn {
+		Def::from((BuiltIn {
 			n_args,
 			func,
-		}.into(), ty)
+		}, ty))
 	}}
 }
 
