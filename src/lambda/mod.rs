@@ -1,14 +1,14 @@
 pub mod dictionary;
 pub mod parser;
 pub mod types;
-mod vars;
+pub mod vars;
 
 pub use dictionary::*;
 pub use parser::*;
 pub use types::*;
+pub use vars::*;
 
 use std::collections::HashSet;
-use vars::*;
 
 #[derive(Clone, Debug)]
 pub enum Term {
@@ -21,22 +21,6 @@ pub enum Term {
 }
 
 impl Term {
-	pub fn solve(&mut self, context: &mut Dictionary) -> &mut Self {
-		use Term::*;
-		loop {
-			self.hnf();
-			match self {
-				App(terms) => {
-					if !context.reduce(terms) {
-						break;
-					}
-				}
-				_ => break,
-			}
-		}
-		self
-	}
-
 	pub fn sub(&mut self, var: Identifier, code: Term) {
 		use Term::*;
 		match self {
@@ -178,6 +162,14 @@ impl Term {
 				free
 			}
 			_ => HashSet::new(),
+		}
+	}
+
+	//Convenient shorthand
+	pub fn int(&self) -> i32 {
+		match self {
+			Self::Num(n) => *n,
+			_ => unimplemented!(),
 		}
 	}
 }

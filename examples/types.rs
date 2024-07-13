@@ -8,11 +8,14 @@ fn main() {
 
 	let mut sub = TypeSub::default();
 	dbg!(sub.unify(&diff, &inst));
-	
+
 	let mut unified = diff.clone();
 	sub.apply(&mut unified);
 
-	println!("{} unify {}: \n\t{:?}\n\tyielding:\n\t{}", base, inst, sub, unified);
+	println!(
+		"{} unify {}: \n\t{:?}\n\tyielding:\n\t{}",
+		base, inst, sub, unified
+	);
 
 	judge(&term!(h t c n -> c h (t c n)));
 	judge(&term!(f g x -> f (g x)));
@@ -26,7 +29,7 @@ fn main() {
 }
 
 fn judge(term: &Term) {
-	let context = Dictionary::new(&[]);
+	let context = dict! {};
 	match context.infer(term) {
 		Some(ty) => println!("{} : {}", term, ty),
 		None => println!("{} is untypable.", term),

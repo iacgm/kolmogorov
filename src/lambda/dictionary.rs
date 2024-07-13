@@ -33,6 +33,10 @@ impl Dictionary {
 		Self { defs: map }
 	}
 
+	pub fn iter_defs(&self) -> impl Iterator<Item = (&Identifier, &Def)> {
+		self.defs.keys().filter_map(|v| Some((v, self.query(v)?)))
+	}
+
 	//Requires strong normalization
 	pub fn execute(&mut self, term: &mut Term) {
 		use Term::*;
@@ -95,10 +99,10 @@ impl Dictionary {
 	pub fn infer(&self, term: &Term) -> Option<Type> {
 		use Type::*;
 
-		type Defs = HashMap<Identifier, Type>;
+		type Args = HashMap<Identifier, Type>;
 
 		fn core(
-			params: (&Dictionary, &mut TypeSub, &mut Defs, &mut VarGen),
+			params: (&Dictionary, &mut TypeSub, &mut Args, &mut VarGen),
 			term: &Term,
 		) -> Option<Type> {
 			let (dict, subs, defs, vgen) = params;
@@ -168,7 +172,7 @@ impl Dictionary {
 		}
 
 		let mut subs = TypeSub::default();
-		let mut defs = Defs::default();
+		let mut defs = Args::default();
 		let mut vgen = VarGen::default();
 
 		for (var, entry) in &self.defs {

@@ -4,7 +4,7 @@ pub use subs::*;
 
 use super::*;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Type {
 	Int,
 	Var(Identifier),
@@ -12,7 +12,37 @@ pub enum Type {
 }
 
 impl Type {
-	pub fn freshen(&mut self, var_gen: &mut VarGen) {
+	pub fn instantiates(&self, other: &Self) -> bool {
+		use Type::*;
+
+		let mut bindings = HashMap::new();
+		let mut stack = vec![(self, other)];
+
+		while let Some(pair) = stack.pop() {
+			match pair {
+				(Int, Int) => continue,
+				(Var(v), right) => {
+					let Some(&expected) = bindings.get(v) else {
+						bindings.insert(v, right);
+						continue;
+					};
+
+					if expected != right {
+						return false;
+					}
+				}
+				(Fun(ld, lr), Fun(rd, rr)) => {
+					stack.push((ld, rd));
+					stack.push((lr, rr));
+				}
+				_ => return false,
+			}
+		}
+
+		true
+	}
+
+	pub fn fresh(&self, vgen: &mut VarGen) -> Self {
 		fn core(ty: &mut Type, map: &HashMap<Identifier, Identifier>) {
 			use Type::*;
 			match ty {
@@ -32,10 +62,12 @@ impl Type {
 		let mut map = HashMap::new();
 
 		for v in self.vars() {
-			map.insert(v, var_gen.newvar());
+			map.insert(v, vgen.cap_var());
 		}
 
-		core(self, &map);
+		let mut clone = self.clone();
+		core(&mut clone, &map);
+		clone
 	}
 
 	pub fn vars(&self) -> HashSet<Identifier> {
@@ -72,5 +104,11 @@ impl Display for Type {
 				write!(f, ")")
 			}
 		}
+	}
+}
+
+impl From<Identifier> for Type {
+	fn from(ident: Identifier) -> Self {
+		Self::Var(ident)
 	}
 }

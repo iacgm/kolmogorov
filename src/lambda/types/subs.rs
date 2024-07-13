@@ -6,7 +6,7 @@ pub struct TypeSub {
 	dict: HashMap<Identifier, Type>,
 }
 
-impl TypeSub {
+impl TypeSub {	
 	pub fn unify(&mut self, lhs: &Type, rhs: &Type) -> bool {
 		use Type::*;
 

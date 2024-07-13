@@ -30,27 +30,27 @@ macro_rules! builtin {
 	(
 		$($ty:tt)=>+
 		$(using [$($captured:ident),+] in)?
-		|$($arg:ident),+| => $body:expr
+		|$($arg:ident),*| => $body:expr
 	) => {{
 		use $crate::*;
 		use std::rc::Rc;
 
 		let ty = ty!($($ty)=>+);
 
-		let n_args = count!($($arg)+);
+		let n_args = count!($($arg)*);
 
 		$($(
 			let $captured = $captured.clone();
 		)+)?
 
 		let func = Rc::new(move |_args: &mut [Term]| {
-			let rev_list!([$($arg),+]) = &mut _args[..] else {
+			let rev_list!([$($arg),*]) = &mut _args[..] else {
 				unreachable!()
 			};
 
 			$(
 				let mut $arg = std::mem::replace($arg, $crate::Term::Num(0));
-			)+
+			)*
 
 			$body
 		});
@@ -63,12 +63,24 @@ macro_rules! builtin {
 }
 
 #[macro_export]
+macro_rules! dict {
+	{$($def:ident),*} => {
+		Dictionary::new(&[$(
+			(stringify!($def), $def.clone())
+		),*])
+	};
+}
+
+#[macro_export]
 macro_rules! ty {
 	(N) => {
 		$crate::Type::Int
 	};
 	(Int) => {
 		$crate::Type::Int
+	};
+	([$e:expr]) => {
+		$e
 	};
 	($x: ident) => {
 		$crate::Type::Var(stringify!($x))
