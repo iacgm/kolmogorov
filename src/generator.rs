@@ -1,7 +1,6 @@
 use super::*;
-use std::collections::HashMap;
 
-type Args = HashMap<Identifier, Type>;
+use rand::prelude::*;
 
 //generates a term of a given type, with a specified size
 pub fn generate_term(dict: &Dictionary, ty: &Type, mut size: usize) -> Option<Term> {
@@ -18,61 +17,61 @@ fn app(
 	subs: &mut TypeSub,
 	vgen: &mut VarGen,
 ) -> Option<Term> {
-	use Term::*;
+	use Type::*;
 
 	fn produces(ty: &Type, target: &Type, subs: &mut TypeSub) -> bool {
-		subs.unify(ty, target)
-			|| if let Type::Fun(_, r) = ty {
+		subs.unify(ty, target).is_some()
+			|| if let Fun(_, r) = ty {
 				r.instantiates(target) || produces(r.as_ref(), target, subs)
 			} else {
 				false
 			}
 	}
 
-	let (head_var, mut v_ty) = dict.iter_defs().find_map(|(v, def)| match def {
-		Def::BuiltIn(_, t) => {
-			let fresh = t.fresh(vgen);
-			if produces(&fresh, ty, subs) {
-				Some((Var(v), fresh))
-			} else {
-				for v in fresh.vars() {
-					vgen.retire(v);
+	let mut defs: Vec<_> = dict.iter_defs().collect();
+
+	defs.shuffle(&mut thread_rng());
+
+	let (head_var, mut v_ty) = defs
+		.iter()
+		.find_map(|(v, def)| match def {
+			Def::BuiltIn(_, t) => {
+				let fresh = t.fresh(vgen);
+				if produces(&fresh, ty, subs) {
+					Some((Term::Var(v), fresh))
+				} else {
+					for v in fresh.vars() {
+						vgen.retire(v);
+					}
+					None
 				}
-				None
 			}
-		}
-		Def::Term(_) => None,
-	})?;
+			Def::Term(_) => None,
+		})?;
 
 	subs.apply(&mut v_ty);
 
 	let mut terms = vec![head_var];
 	let mut app_ty = v_ty;
 
-	while !subs.unify(ty, &app_ty) {
-		let d = Type::Var(vgen.newvar());
-		let r = Type::Var(vgen.newvar());
-		let mut fun = ty!([d] => [r]);
+	loop {
+		if subs.unify(ty, &app_ty).is_some() {
+			terms.reverse();
+			return Some(Term::App(terms));
+		}
 
-		subs.unify(&app_ty, &fun);
-		subs.apply(&mut fun);
-
-		let Type::Fun(l, r) = fun else { unreachable!() };
+		let d = vgen.newvar();
+		let r = vgen.newvar();
+		let Some(Fun(l, r)) = subs.unify(&app_ty, &ty!([Var(d)] => [Var(r)])) else {
+			unreachable!()
+		};
 
 		terms.push(app(&l, size, dict, subs, vgen)?);
-		*size -= 1;
-
 		app_ty = *r;
 	}
-
-	terms.reverse();
-
-	let term = App(terms);
-	println!("<|{}", term);
-	Some(term)
 }
 
-fn var(ty: &Type, dict: &Dictionary, subs: &mut TypeSub, vgen: &mut VarGen) -> Option<Term> {
+/* fn var(ty: &Type, dict: &Dictionary, subs: &mut TypeSub, vgen: &mut VarGen) -> Option<Term> {
 	use Term::*;
 	dict.iter_defs().find_map(|(v, def)| match def {
 		Def::BuiltIn(_, t) => {
@@ -89,3 +88,4 @@ fn var(ty: &Type, dict: &Dictionary, subs: &mut TypeSub, vgen: &mut VarGen) -> O
 		Def::Term(_) => None,
 	})
 }
+ */

@@ -6,8 +6,8 @@ pub struct TypeSub {
 	dict: HashMap<Identifier, Type>,
 }
 
-impl TypeSub {	
-	pub fn unify(&mut self, lhs: &Type, rhs: &Type) -> bool {
+impl TypeSub {
+	pub fn unify(&mut self, lhs: &Type, rhs: &Type) -> Option<Type> {
 		use Type::*;
 
 		type RefSub<'a> = HashMap<Identifier, &'a Type>;
@@ -36,7 +36,7 @@ impl TypeSub {
 				(Var(x), Var(y)) if x == y => continue,
 				(t, Var(v)) | (Var(v), t) => {
 					if contains(&subs, v, t) {
-						return false;
+						return None;
 					}
 
 					if let Some(expected) = self.dict.get(v) {
@@ -54,7 +54,7 @@ impl TypeSub {
 					stack.push((lx, rx));
 					stack.push((ly, ry));
 				}
-				_ => return false,
+				_ => return None,
 			}
 		}
 
@@ -67,7 +67,9 @@ impl TypeSub {
 			self.dict.insert(id, mono.clone());
 		}
 
-		true
+		let mut ty = lhs.clone();
+		self.apply(&mut ty);
+		Some(ty)
 	}
 
 	pub fn apply(&self, ty: &mut Type) {

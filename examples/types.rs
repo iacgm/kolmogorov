@@ -7,7 +7,7 @@ fn main() {
 	let diff = ty!((b => c) => (a => b) => (a => c));
 
 	let mut sub = TypeSub::default();
-	dbg!(sub.unify(&diff, &inst));
+	dbg!(sub.unify(&mut diff.clone(), &mut inst.clone()));
 
 	let mut unified = diff.clone();
 	sub.apply(&mut unified);

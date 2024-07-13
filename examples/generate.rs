@@ -25,7 +25,7 @@ fn main() {
 
 	let dictionary = dict! { plus, mult, zero, one };
 
-	let ty = ty!(N => N);
+	let ty = ty!(N);
 
 	let generated = generate_term(&dictionary, &ty, 10);
 

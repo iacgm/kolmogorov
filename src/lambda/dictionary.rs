@@ -154,16 +154,15 @@ impl Dictionary {
 
 						let newvar = vgen.cap_var();
 
-						let mut tau = Var(newvar);
+						let tau = Var(newvar);
+						let fun_ty = Fun(rht.into(), tau.into());
 
-						let fun_ty = Fun(rht.into(), tau.clone().into());
-
-						if !subs.unify(&lht, &fun_ty) {
-							return None;
+						match subs.unify(&lht, &fun_ty) {
+							Some(Fun(_, tau)) => {
+								lht = *tau;
+							}
+							_ => return None,
 						}
-
-						subs.apply(&mut tau);
-						lht = tau;
 					}
 
 					Some(lht)
