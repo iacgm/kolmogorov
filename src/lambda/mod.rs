@@ -165,7 +165,15 @@ impl Term {
 		}
 	}
 
-	//Convenient shorthand
+	pub fn size(&self) -> usize {
+		match self {
+			Term::Num(_) | Term::Var(_) => 1,
+			Term::Lam(_, b) => 1 + b.size(),
+			Term::App(terms) => terms.len() - 1 + terms.iter().map(Term::size).sum::<usize>(),
+		}
+	}
+
+	//Convenient shorthand, especially useful for implementing builtins
 	pub fn int(&self) -> i32 {
 		match self {
 			Self::Num(n) => *n,

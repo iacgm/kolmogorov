@@ -84,6 +84,15 @@ impl Type {
 			}
 		}
 	}
+
+	pub fn order(&self) -> Option<usize> {
+		use Type::*;
+		match self {
+			Int => Some(0),
+			Var(_) => None,
+			Fun(l, r) => Some(r.order()?.max(l.order()? + 1)),
+		}
+	}
 }
 
 use std::{collections::HashMap, fmt::*};

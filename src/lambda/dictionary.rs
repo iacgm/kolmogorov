@@ -43,11 +43,13 @@ impl Dictionary {
 
 		match term {
 			Num(_) => (),
-			Var(v) => {
-				if let Some(Def::Term(t)) = self.query(v) {
-					*term = t.clone();
+			Var(v) => match self.query(v) {
+				Some(Def::Term(t)) => *term = t.clone(),
+				Some(Def::BuiltIn(BuiltIn { n_args, func }, _)) if *n_args == 0 => {
+					*term = func(&mut [])
 				}
-			}
+				_ => (),
+			},
 			Lam(v, b) => {
 				self.shadow(v);
 				self.execute(b);
@@ -220,7 +222,7 @@ impl Dictionary {
 		}
 	}
 
-	fn query(&self, ident: Identifier) -> Option<&Def> {
+	pub fn query(&self, ident: Identifier) -> Option<&Def> {
 		let defs = self.defs.get(&ident)?;
 		defs.last()?.as_ref()
 	}
