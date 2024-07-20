@@ -25,9 +25,10 @@ fn main() {
 	let dict = dict! { plus, mult, zero, one };
 
 	let ty = ty!(N => N);
-	
+
 	//Interestingly, this is 4 * the catalan numbers
 	for n in (3..).step_by(4) {
+		reset_count();
 		let start = std::time::Instant::now();
 
 		let count: usize = enumerate(&dict, &ty, n).count();

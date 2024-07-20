@@ -7,9 +7,13 @@ static mut COUNTER: usize = 0;
 
 fn alloc<T>(v: T) -> Box<T> {
 	unsafe {
-		COUNTER += 1;
+		COUNTER += std::mem::size_of_val(&v);
 	}
 	v.into()
+}
+
+pub fn reset_count() {
+	unsafe { COUNTER = 0 }
 }
 
 pub fn alloc_count() -> usize {
