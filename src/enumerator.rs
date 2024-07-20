@@ -3,8 +3,21 @@ use super::*;
 
 type TermIterator<'a> = Box<dyn Iterator<Item = Term> + 'a>;
 
+static mut COUNTER: usize = 0;
+
+fn alloc<T>(v: T) -> Box<T> {
+	unsafe {
+		COUNTER += 1;
+	}
+	v.into()
+}
+
+pub fn alloc_count() -> usize {
+	unsafe { COUNTER }
+}
+
 pub fn enumerate<'a>(dict: &'a Dictionary, target_ty: &'a Type, size: usize) -> TermIterator<'a> {
-	Box::new(vars_producing(dict, target_ty).flat_map(move |(var, ty)| {
+	alloc(vars_producing(dict, target_ty).flat_map(move |(var, ty)| {
 		apply_args(dict, target_ty, Stack::from(Term::Var(var)), ty, size - 1)
 	}))
 }
@@ -16,15 +29,17 @@ fn apply_args<'a>(
 	l_ty: &'a Type,
 	r_size: usize,
 ) -> TermIterator<'a> {
-	if l_ty == target_ty {
-		if r_size == 0 {
-			let apps = lefts.rev_vec();
-			let term = Term::App(apps);
+	let done = l_ty == target_ty;
 
-			return Box::new(Some(term).into_iter());
-		} else {
-			return Box::new(std::iter::empty());
-		}
+	if r_size == 0 && done {
+		let apps = lefts.rev_vec();
+		let term = Term::App(apps);
+
+		return alloc(Some(term).into_iter());
+	}
+
+	if r_size <= 1 || done {
+		return alloc(std::iter::empty());
 	}
 
 	let Type::Fun(d, r_ty) = l_ty else {
@@ -33,7 +48,14 @@ fn apply_args<'a>(
 
 	let r_ty = &**r_ty;
 
-	Box::new((1..r_size).flat_map(move |arg_size| {
+	if r_ty == target_ty {
+		return alloc(enumerate(dict, d, r_size - 1).map(move |t| {
+			let apps = lefts.cons(t).rev_vec();
+			Term::App(apps)
+		}));
+	}
+
+	alloc((1..r_size).flat_map(move |arg_size| {
 		let lefts = lefts.clone();
 		enumerate(dict, d, arg_size).flat_map(move |t| {
 			apply_args(dict, target_ty, lefts.cons(t), r_ty, r_size - arg_size - 1)

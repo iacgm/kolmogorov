@@ -24,13 +24,21 @@ fn main() {
 
 	let dict = dict! { plus, mult, zero, one };
 
+	let ty = ty!(N => N);
+	
 	//Interestingly, this is 4 * the catalan numbers
 	for n in (3..).step_by(4) {
-		let ty = ty!(N => N);
+		let start = std::time::Instant::now();
+
 		let count: usize = enumerate(&dict, &ty, n).count();
 		println!(
 			"There are {:>6} programs of type {} and size {}.",
 			count, ty, n
 		);
+
+		let end = std::time::Instant::now();
+
+		println!("Time elapsed: {}s", end.duration_since(start).as_secs_f32());
+		println!("{} allocs.\n", alloc_count());
 	}
 }
