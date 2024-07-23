@@ -4,7 +4,7 @@ pub use subs::*;
 
 use super::*;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub enum Type {
 	Int,
 	Var(Identifier),
@@ -113,6 +113,12 @@ impl Display for Type {
 				write!(f, ")")
 			}
 		}
+	}
+}
+
+impl Debug for Type {
+	fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+		Display::fmt(self, f)
 	}
 }
 

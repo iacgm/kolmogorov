@@ -22,7 +22,7 @@ pub fn alloc_count() -> usize {
 
 pub fn enumerate<'a>(dict: &'a Dictionary, target_ty: &'a Type, size: usize) -> TermIterator<'a> {
 	alloc(vars_producing(dict, target_ty).flat_map(move |(var, ty)| {
-		apply_args(dict, target_ty, Stack::from(Term::Var(var)), ty, size - 1)
+		apply_args(dict, target_ty, Stack::one(Term::Var(var)), ty, size - 1)
 	}))
 }
 

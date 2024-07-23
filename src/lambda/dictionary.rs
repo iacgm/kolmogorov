@@ -18,6 +18,7 @@ pub enum Def {
 
 type Entry = Option<Def>;
 
+#[derive(Clone)]
 pub struct Dictionary {
 	defs: HashMap<Identifier, Vec<Entry>>,
 }
