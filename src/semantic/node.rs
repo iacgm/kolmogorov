@@ -15,7 +15,7 @@ pub struct SearchNode {
 pub enum NodeKind {
 	All(bool), //bool to indicate whether this node has been visited
 	ArgTo(Stack<Term>, Rc<Type>, Option<usize>),
-	HeadVars(Vec<(Identifier, Type)>),
+	HeadVars(Vec<(Identifier, Rc<Type>)>),
 }
 
 impl Debug for NodeKind {

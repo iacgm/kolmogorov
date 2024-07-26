@@ -13,7 +13,7 @@ pub struct BuiltIn {
 #[derive(Clone)]
 pub enum Def {
 	Term(Term),
-	BuiltIn(BuiltIn, Type),
+	BuiltIn(BuiltIn, Rc<Type>),
 }
 
 type Entry = Option<Def>;
@@ -118,7 +118,7 @@ impl Dictionary {
 
 					match dict.query(v)? {
 						Def::Term(term) => dict.infer(term),
-						Def::BuiltIn(_, ty) => Some(ty.clone()),
+						Def::BuiltIn(_, ty) => Some((**ty).clone()),
 					}
 				}
 				Term::Lam(v, b) => {
@@ -249,7 +249,7 @@ impl Dictionary {
 
 impl From<(BuiltIn, Type)> for Def {
 	fn from((func, ty): (BuiltIn, Type)) -> Self {
-		Self::BuiltIn(func, ty)
+		Self::BuiltIn(func, Rc::new(ty))
 	}
 }
 

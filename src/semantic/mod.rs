@@ -15,6 +15,7 @@ Rules that could be used to prune search tree are:
 */
 
 use super::*;
+use std::rc::Rc;
 
 mod node;
 use node::*;
@@ -192,7 +193,7 @@ impl Iterator for Searcher {
 	}
 }
 
-fn vars_producing(dict: &Dictionary, ty: &Type) -> Vec<(Identifier, Type)> {
+fn vars_producing(dict: &Dictionary, ty: &Type) -> Vec<(Identifier, Rc<Type>)> {
 	dict.iter_defs()
 		.filter_map(move |(&v, def)| match def {
 			Def::BuiltIn(_, t) if produces(t, ty) => Some((v, t.clone())),
