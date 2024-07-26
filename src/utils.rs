@@ -30,25 +30,30 @@ impl<T> Stack<T> {
 		Node::Cons(v, Stack(self.0.clone())).into()
 	}
 
-	//returns the stack as a reversed vector
-	pub fn rev_vec(&self) -> Vec<T>
-	where
-		T: Clone,
-	{
-		let mut vec = vec![];
-
-		let mut node = &*self.0;
-		while let Node::Cons(h, t) = node {
-			vec.push(h.clone());
-			node = &*t.0;
+	pub fn is_nil(&self) -> bool {
+		use Node::*;
+		match *self.0 {
+			Nil => true,
+			Cons(_, _) => false,
 		}
-
-		vec
 	}
 }
 
 impl<T> From<Node<T>> for Stack<T> {
 	fn from(value: Node<T>) -> Self {
 		Self(value.into())
+	}
+}
+
+use super::lambda::Term;
+impl Stack<Term> {
+	//returns the stack as a reversed vector
+	pub fn build_term(&self) -> Term {
+		use Node::*;
+		match &*self.0 {
+			Nil => unimplemented!(),
+			Cons(h, t) if t.is_nil() => h.clone(),
+			Cons(h, t) => t.build_term().applied_to(h.clone()),
+		}
 	}
 }

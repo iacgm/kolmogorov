@@ -36,8 +36,7 @@ fn apply_args<'a>(
 	let done = l_ty == target_ty;
 
 	if r_size == 0 && done {
-		let apps = lefts.rev_vec();
-		let term = Term::App(apps);
+		let term = lefts.build_term();
 
 		return alloc(Some(term).into_iter());
 	}
@@ -53,10 +52,7 @@ fn apply_args<'a>(
 	let r_ty = &**r_ty;
 
 	if r_ty == target_ty {
-		return alloc(enumerate(dict, d, r_size - 1).map(move |t| {
-			let apps = lefts.cons(t).rev_vec();
-			Term::App(apps)
-		}));
+		return alloc(enumerate(dict, d, r_size - 1).map(move |t| lefts.cons(t).build_term()));
 	}
 
 	alloc((1..r_size).flat_map(move |arg_size| {

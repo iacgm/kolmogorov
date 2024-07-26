@@ -104,7 +104,7 @@ impl Searcher {
 				let done = l_ty == targ;
 
 				if *size == 0 && done {
-					let term = Term::App(apps.rev_vec());
+					let term = apps.build_term();
 					self.calls.pop();
 					return Some(term);
 				} else if *size == 0 || done {
