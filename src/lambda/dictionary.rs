@@ -1,5 +1,5 @@
 use super::*;
-use std::collections::*;
+use rustc_hash::FxHashMap as HashMap;
 use std::rc::Rc;
 
 type BuiltInFunc = Rc<dyn Fn(&mut [Term]) -> Term>;
@@ -25,7 +25,7 @@ pub struct Dictionary {
 
 impl Dictionary {
 	pub fn new(defs: &[(Identifier, Def)]) -> Self {
-		let mut map = HashMap::new();
+		let mut map = HashMap::default();
 
 		for (k, v) in defs {
 			map.insert(*k, vec![Some(v.clone())]);
@@ -162,7 +162,7 @@ impl Dictionary {
 
 						match subs.unify(&lht, &fun_ty) {
 							Some(Fun(_, tau)) => {
-								lht = *tau;
+								lht = (*tau).clone();
 							}
 							_ => return None,
 						}

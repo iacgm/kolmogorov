@@ -32,7 +32,7 @@ impl Searcher {
 		Searcher {
 			dict: dict.clone(),
 			calls: vec![SearchNode {
-				targ: targ.clone(),
+				targ: targ.clone().into(),
 				size,
 				kind: All(false),
 			}],
@@ -91,7 +91,7 @@ impl Searcher {
 				let node = SearchNode {
 					targ: targ.clone(),
 					size: *size - 1,
-					kind: ArgTo(Stack::one(Term::Var(var)), v_ty, None),
+					kind: ArgTo(Stack::one(Term::Var(var)), v_ty.into(), None),
 				};
 
 				self.calls.push(node);
@@ -111,13 +111,13 @@ impl Searcher {
 					return None;
 				}
 
-				let Type::Fun(arg, _) = l_ty else {
+				let Type::Fun(arg, _) = &**l_ty else {
 					self.calls.pop();
 					return None;
 				};
 
 				let node = SearchNode {
-					targ: *arg.clone(),
+					targ: arg.clone(),
 					size: *size - 1,
 					kind: NodeKind::All(false),
 				};
@@ -127,14 +127,14 @@ impl Searcher {
 				None
 			}
 			ArgTo(apps, l_ty, None) => {
-				let Type::Fun(arg_ty, ret) = l_ty else {
+				let Type::Fun(arg_ty, ret) = &**l_ty else {
 					unreachable!()
 				};
 
-				let arg_ty = *arg_ty.clone();
+				let arg_ty = arg_ty.clone();
 				let targ = targ.clone();
 				let size = *size;
-				let ret = *ret.clone();
+				let ret = ret.clone();
 				let apps = apps.clone();
 
 				let (arg, arg_size) = loop {

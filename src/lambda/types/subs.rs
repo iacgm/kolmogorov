@@ -1,5 +1,5 @@
 use super::*;
-use std::collections::HashMap;
+use rustc_hash::FxHashMap as HashMap;
 
 #[derive(Default, Debug)]
 pub struct TypeSub {
@@ -83,8 +83,8 @@ impl TypeSub {
 				}
 			}
 			Fun(l, r) => {
-				self.apply(l);
-				self.apply(r);
+				self.apply(Rc::make_mut(l));
+				self.apply(Rc::make_mut(r));
 			}
 		}
 	}

@@ -2,18 +2,19 @@ use std::fmt::Debug;
 
 //Abstracted because we will try later to eliminate as many unnecessary allocs as possible
 use super::*;
+use std::rc::Rc;
 
 #[derive(Debug)]
 pub struct SearchNode {
-	pub targ: Type,  //Target type
-	pub size: usize, //Size 
+	pub targ: Rc<Type>, //Target type
+	pub size: usize,    //Size
 	pub kind: NodeKind,
 }
 
 #[derive(Clone)]
 pub enum NodeKind {
 	All(bool), //bool to indicate whether this node has been visited
-	ArgTo(Stack<Term>, Type, Option<usize>),
+	ArgTo(Stack<Term>, Rc<Type>, Option<usize>),
 	HeadVars(Vec<(Identifier, Type)>),
 }
 

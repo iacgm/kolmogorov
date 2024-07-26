@@ -3,19 +3,21 @@ pub mod subs;
 pub use subs::*;
 
 use super::*;
+use rustc_hash::FxHashMap as HashMap;
+use std::rc::Rc;
 
 #[derive(Clone, PartialEq)]
 pub enum Type {
 	Int,
 	Var(Identifier),
-	Fun(Box<Type>, Box<Type>),
+	Fun(Rc<Type>, Rc<Type>),
 }
 
 impl Type {
 	pub fn instantiates(&self, other: &Self) -> bool {
 		use Type::*;
 
-		let mut bindings = HashMap::new();
+		let mut bindings = HashMap::default();
 		let mut stack = vec![(self, other)];
 
 		while let Some(pair) = stack.pop() {
@@ -53,13 +55,13 @@ impl Type {
 					}
 				}
 				Fun(l, r) => {
-					core(l, map);
-					core(r, map);
+					core(Rc::make_mut(l), map);
+					core(Rc::make_mut(r), map);
 				}
 			}
 		}
 
-		let mut map = HashMap::new();
+		let mut map = HashMap::default();
 
 		for v in self.vars() {
 			map.insert(v, vgen.cap_var());
@@ -95,7 +97,7 @@ impl Type {
 	}
 }
 
-use std::{collections::HashMap, fmt::*};
+use std::fmt::*;
 impl Display for Type {
 	fn fmt(&self, f: &mut Formatter<'_>) -> Result {
 		use Type::*;
