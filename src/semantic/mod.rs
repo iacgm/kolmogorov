@@ -35,6 +35,7 @@ impl Searcher {
 			calls: vec![SearchNode {
 				targ: targ.clone().into(),
 				size,
+				next: None,
 				kind: All(false),
 			}],
 		}
@@ -55,35 +56,52 @@ impl Searcher {
 	fn try_next_at(&mut self, n: usize) -> Option<Term> {
 		let len = self.calls.len();
 
-		let SearchNode { targ, size, kind } = &mut self.calls[n];
+		let SearchNode {
+			targ,
+			size,
+			next,
+			kind,
+		} = &mut self.calls[n];
+
+		if let Some(p) = next {
+			let p = *p;
+			if p < len {
+				return self.try_next_at(p);
+			} else {
+				*next = None;
+			}
+		}
 
 		use NodeKind::*;
 		match kind {
-			All(false) if n == len - 1 => {
+			All(false) => {
+				*next = Some(len);
+
 				let vars = vars_producing(&self.dict, targ);
 
 				*kind = All(true);
 				let node = SearchNode {
 					targ: targ.clone(),
 					size: *size,
+					next: None,
 					kind: HeadVars(vars),
 				};
 				self.calls.push(node);
 
 				self.next_at(n + 1)
 			}
-			All(false) => self.next_at(n + 1),
-			All(true) if n == len - 1 => {
+			All(true) => {
 				self.calls.pop();
 				None
 			}
-			All(true) => self.next_at(n + 1),
 
 			HeadVars(_) if *size == 0 => {
 				self.calls.pop();
 				None
 			}
-			HeadVars(vars) if n == len - 1 => {
+			HeadVars(vars) => {
+				*next = Some(n + 1);
+
 				let Some((var, v_ty)) = vars.pop() else {
 					self.calls.pop();
 					return None;
@@ -92,22 +110,20 @@ impl Searcher {
 				let node = SearchNode {
 					targ: targ.clone(),
 					size: *size - 1,
-					kind: ArgTo(Stack::one(Term::Var(var)), v_ty.into(), None),
+					next: None,
+					kind: ArgTo(Stack::one(Term::Var(var)), v_ty),
 				};
 
 				self.calls.push(node);
 				None
 			}
-			HeadVars(_) => self.next_at(n + 1),
 
-			ArgTo(apps, l_ty, None) if n == len - 1 => {
-				let done = l_ty == targ;
-
-				if *size == 0 && done {
+			ArgTo(apps, l_ty) if n == len - 1 => {
+				if *size == 0 && l_ty == targ {
 					let term = apps.build_term();
 					self.calls.pop();
 					return Some(term);
-				} else if *size == 0 || done {
+				} else if *size == 0 || l_ty == targ {
 					self.calls.pop();
 					return None;
 				}
@@ -120,6 +136,7 @@ impl Searcher {
 				let node = SearchNode {
 					targ: arg.clone(),
 					size: *size - 1,
+					next: None,
 					kind: NodeKind::All(false),
 				};
 
@@ -127,7 +144,7 @@ impl Searcher {
 
 				None
 			}
-			ArgTo(apps, l_ty, None) => {
+			ArgTo(apps, l_ty) => {
 				let Type::Fun(arg_ty, ret) = &**l_ty else {
 					unreachable!()
 				};
@@ -150,6 +167,7 @@ impl Searcher {
 							let node = SearchNode {
 								targ: arg_ty.clone(),
 								size: arg_size - 1,
+								next: None,
 								kind: All(false),
 							};
 							self.calls.push(node);
@@ -158,29 +176,18 @@ impl Searcher {
 				};
 
 				let len = self.calls.len();
-				let ArgTo(_, _, next) = &mut self.calls[n].kind else {
-					unreachable!()
-				};
 
-				*next = Some(len);
+				self.calls[n].next = Some(len);
 
 				let node = SearchNode {
 					targ,
 					size: size - arg_size - 1,
-					kind: ArgTo(apps.cons(arg), ret, None),
+					next: None,
+					kind: ArgTo(apps.cons(arg), ret),
 				};
 
 				self.calls.push(node);
 				None
-			}
-			ArgTo(_, _, next) => {
-				let p = next.unwrap();
-				if p < len {
-					self.next_at(p)
-				} else {
-					*next = None;
-					None
-				}
 			}
 		}
 	}
@@ -195,7 +202,7 @@ impl Iterator for Searcher {
 
 fn vars_producing(dict: &Dictionary, ty: &Type) -> Vec<(Identifier, Rc<Type>)> {
 	dict.iter_defs()
-		.filter_map(move |(&v, def)| match def {
+		.filter_map(move |(v, def)| match def {
 			Def::BuiltIn(_, t) if produces(t, ty) => Some((v, t.clone())),
 			_ => None,
 		})

@@ -67,7 +67,7 @@ fn vars_producing<'a>(
 	dict: &'a Dictionary,
 	ty: &'a Type,
 ) -> impl Iterator<Item = (Identifier, &'a Type)> + 'a {
-	dict.iter_defs().filter_map(move |(&v, def)| match def {
+	dict.iter_defs().filter_map(move |(v, def)| match def {
 		Def::BuiltIn(_, t) if produces(t, ty) => Some((v, &**t)),
 		_ => None,
 	})

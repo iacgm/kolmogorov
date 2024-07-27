@@ -34,8 +34,10 @@ impl Dictionary {
 		Self { defs: map }
 	}
 
-	pub fn iter_defs(&self) -> impl Iterator<Item = (&Identifier, &Def)> {
-		self.defs.keys().filter_map(|v| Some((v, self.query(v)?)))
+	pub fn iter_defs(&self) -> impl Iterator<Item = (Identifier, &Def)> {
+		self.defs
+			.iter()
+			.filter_map(|(&k, v)| Some((k, v.last()?.as_ref()?)))
 	}
 
 	//Requires strong normalization
