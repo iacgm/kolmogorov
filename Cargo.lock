@@ -7,6 +7,7 @@ name = "kolmogorov"
 version = "0.1.0"
 dependencies = [
  "rustc-hash",
+ "smallvec",
 ]
 
 [[package]]
@@ -14,3 +15,9 @@ name = "rustc-hash"
 version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "583034fd73374156e66797ed8e5b0d5690409c9226b22d87cb7f19821c05d152"
+
+[[package]]
+name = "smallvec"
+version = "1.13.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3c5e1a9a646d36c3599cd173a41282daf47c44583ad367b8e6837255952e5c67"

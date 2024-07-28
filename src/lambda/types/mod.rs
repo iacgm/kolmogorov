@@ -1,8 +1,10 @@
 pub mod subs;
-
+pub mod cache;
 pub use subs::*;
+pub use cache::*;
 
 use super::*;
+
 use rustc_hash::FxHashMap as HashMap;
 use std::rc::Rc;
 

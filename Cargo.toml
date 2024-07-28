@@ -7,3 +7,4 @@ edition = "2021"
 
 [dependencies]
 rustc-hash = "2.0.0"
+smallvec = "1.13"

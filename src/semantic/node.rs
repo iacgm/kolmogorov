@@ -1,7 +1,7 @@
-use std::fmt::Debug;
-
-//Abstracted because we will try later to eliminate as many unnecessary allocs as possible
 use super::*;
+
+use smallvec::SmallVec;
+use std::fmt::Debug;
 use std::rc::Rc;
 
 #[derive(Debug)]
@@ -12,11 +12,14 @@ pub struct SearchNode {
 	pub kind: NodeKind,
 }
 
+type VarDef = (Identifier, Rc<Type>);
+pub type VarsVec = SmallVec<[VarDef; 4]>;
+
 #[derive(Clone)]
 pub enum NodeKind {
 	All(bool), //bool to indicate whether this node has been visited
 	ArgTo(Stack<Term>, Rc<Type>),
-	HeadVars(Vec<(Identifier, Rc<Type>)>),
+	HeadVars(VarsVec),
 }
 
 impl Debug for NodeKind {

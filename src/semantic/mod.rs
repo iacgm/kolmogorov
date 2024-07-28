@@ -14,11 +14,10 @@ Rules that could be used to prune search tree are:
 	> Unnecessary repetition (folds on constant functions, for example)
 */
 
-use super::*;
-use std::rc::Rc;
-
 mod node;
 use node::*;
+
+use super::*;
 
 use NodeKind::*;
 
@@ -200,7 +199,7 @@ impl Iterator for Searcher {
 	}
 }
 
-fn vars_producing(dict: &Dictionary, ty: &Type) -> Vec<(Identifier, Rc<Type>)> {
+fn vars_producing(dict: &Dictionary, ty: &Type) -> VarsVec {
 	dict.iter_defs()
 		.filter_map(move |(v, def)| match def {
 			Def::BuiltIn(_, t) if produces(t, ty) => Some((v, t.clone())),
