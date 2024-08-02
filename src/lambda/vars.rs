@@ -23,7 +23,7 @@ impl VarGen {
 	}
 
 	pub fn small_var(&mut self) -> Identifier {
-		self.find_with(|c| !c.is_ascii_uppercase())
+		self.find_with(|c| c.is_ascii_lowercase())
 	}
 
 	pub fn cap_var(&mut self) -> Identifier {

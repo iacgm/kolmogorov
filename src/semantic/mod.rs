@@ -102,7 +102,7 @@ impl Searcher {
 				*next = Some(len);
 				*kind = All(Completed);
 
-				let ident = self.vgen.newvar();
+				let ident = self.vgen.small_var();
 
 				let node = SearchNode {
 					targ: targ.clone(),
