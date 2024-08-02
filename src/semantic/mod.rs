@@ -19,24 +19,29 @@ use node::*;
 
 use super::*;
 
+use std::rc::Rc;
 use NodeKind::*;
 
 //A series of applied terms, annotated with type
 pub struct Searcher {
 	dict: Dictionary,
+	vgen: VarGen,
 	calls: Vec<SearchNode>,
+	arg_vars: Vec<(Identifier, Rc<Type>)>,
 }
 
 impl Searcher {
 	pub fn search(dict: &Dictionary, targ: &Type, size: usize) -> Self {
 		Searcher {
 			dict: dict.clone(),
+			vgen: dict.vgen(),
 			calls: vec![SearchNode {
 				targ: targ.clone().into(),
 				size,
 				next: None,
-				kind: All(false),
+				kind: All(Phase::Body),
 			}],
+			arg_vars: vec![],
 		}
 	}
 
@@ -72,16 +77,20 @@ impl Searcher {
 		}
 
 		use NodeKind::*;
+		use Phase::*;
 		match kind {
-			All(false) => {
+			All(Body) => {
 				*next = Some(len);
+				*kind = All(Abstraction);
 
-				let vars = vars_producing(&self.dict, targ);
+				let size = *size;
+				let targ = targ.clone();
 
-				*kind = All(true);
+				let vars = self.vars_producing(&targ);
+
 				let node = SearchNode {
-					targ: targ.clone(),
-					size: *size,
+					targ,
+					size,
 					next: None,
 					kind: HeadVars(vars),
 				};
@@ -89,9 +98,59 @@ impl Searcher {
 
 				self.next_at(n + 1)
 			}
-			All(true) => {
+			All(Abstraction) => {
+				*next = Some(len);
+				*kind = All(Completed);
+
+				let ident = self.vgen.newvar();
+
+				let node = SearchNode {
+					targ: targ.clone(),
+					size: *size,
+					next: None,
+					kind: Abs(ident),
+				};
+				self.calls.push(node);
+
+				self.next_at(n + 1)
+			}
+			All(Completed) => {
 				self.calls.pop();
 				None
+			}
+
+			Abs(ident) if n == len - 1 => {
+				let ident = *ident;
+				let Type::Fun(arg, ret) = &**targ else {
+					self.vgen.freshen(ident);
+					self.calls.pop();
+					return None;
+				};
+
+				let node = SearchNode {
+					targ: ret.clone(),
+					size: *size - 1,
+					next: None,
+					kind: NodeKind::All(Body),
+				};
+
+				self.arg_vars.push((ident, arg.clone()));
+
+				self.calls.push(node);
+
+				None
+			}
+
+			Abs(ident) => {
+				let ident = *ident;
+
+				let Some(body) = self.next_at(n + 1) else {
+					self.vgen.freshen(ident);
+					self.calls.pop();
+					return None;
+				};
+
+				Some(Term::Lam(ident, Box::new(body)))
 			}
 
 			HeadVars(_) if *size == 0 => {
@@ -136,7 +195,7 @@ impl Searcher {
 					targ: arg.clone(),
 					size: *size - 1,
 					next: None,
-					kind: NodeKind::All(false),
+					kind: NodeKind::All(Body),
 				};
 
 				self.calls.push(node);
@@ -167,7 +226,7 @@ impl Searcher {
 								targ: arg_ty.clone(),
 								size: arg_size - 1,
 								next: None,
-								kind: All(false),
+								kind: All(Body),
 							};
 							self.calls.push(node);
 						}
@@ -190,6 +249,34 @@ impl Searcher {
 			}
 		}
 	}
+
+	fn vars_producing(&self, ty: &Type) -> VarsVec {
+		let valid = move |t: &Type| produces(t, ty);
+
+		let mut vec: VarsVec = self
+			.dict
+			.iter_builtins()
+			.filter_map(
+				move |(&v, BuiltIn { ty: t, .. })| {
+					if valid(t) {
+						Some((v, t.clone()))
+					} else {
+						None
+					}
+				},
+			)
+			.collect();
+
+		vec.extend(self.arg_vars.iter().filter_map(move |(v, t)| {
+			if valid(t) {
+				Some((*v, t.clone()))
+			} else {
+				None
+			}
+		}));
+
+		vec
+	}
 }
 
 impl Iterator for Searcher {
@@ -197,15 +284,6 @@ impl Iterator for Searcher {
 	fn next(&mut self) -> Option<Term> {
 		self.next_at(0)
 	}
-}
-
-fn vars_producing(dict: &Dictionary, ty: &Type) -> VarsVec {
-	dict.iter_defs()
-		.filter_map(move |(v, def)| match def {
-			Def::BuiltIn(_, t) if produces(t, ty) => Some((v, t.clone())),
-			_ => None,
-		})
-		.collect()
 }
 
 fn produces(ty: &Type, target: &Type) -> bool {

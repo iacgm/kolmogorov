@@ -31,10 +31,15 @@ fn main() {
 
 		let searcher = Searcher::search(&dict, &ty, n);
 
-		let count: usize = searcher.count();
+		let mut count = 0;
+
+		for term in searcher {
+			count += 1;
+			println!("{}", term);
+		}
 
 		println!(
-			"There are {:>6} known-distinct programs of type {} and size {}.",
+			"These are all {:>6} known-distinct programs of type {} and size {}.",
 			count, ty, n
 		);
 

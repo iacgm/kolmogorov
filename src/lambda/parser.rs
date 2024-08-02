@@ -55,10 +55,11 @@ macro_rules! builtin {
 			$body
 		});
 
-		Def::from((BuiltIn {
+		BuiltIn {
 			n_args,
 			func,
-		}, ty))
+			ty: std::rc::Rc::new(ty)
+		}
 	}}
 }
 

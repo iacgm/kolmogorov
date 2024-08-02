@@ -15,20 +15,30 @@ pub struct SearchNode {
 type VarDef = (Identifier, Rc<Type>);
 pub type VarsVec = SmallVec<[VarDef; 4]>;
 
+//Top level search phases
+#[derive(Clone, Debug)]
+pub enum Phase {
+	Body,
+	Abstraction,
+	Completed,
+}
+
 #[derive(Clone)]
 pub enum NodeKind {
-	All(bool), //bool to indicate whether this node has been visited
+	All(Phase),
 	ArgTo(Stack<Term>, Rc<Type>),
 	HeadVars(VarsVec),
+	Abs(Identifier),
 }
 
 impl Debug for NodeKind {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		use NodeKind::*;
 		match self {
-			All(b) => write!(f, "All({})", b),
+			All(b) => write!(f, "All({:?})", b),
 			ArgTo(s, t) => write!(f, "ArgTo({:?}, {})", s, t),
 			HeadVars(vs) => write!(f, "Vars({:?})", vs),
+			Abs(v) => write!(f, "Abs({:?})", v),
 		}
 	}
 }

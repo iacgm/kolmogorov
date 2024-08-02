@@ -8,36 +8,31 @@ type BuiltInFunc = Rc<dyn Fn(&mut [Term]) -> Term>;
 pub struct BuiltIn {
 	pub n_args: usize,
 	pub func: BuiltInFunc,
+	pub ty: Rc<Type>,
 }
-
-#[derive(Clone)]
-pub enum Def {
-	Term(Term),
-	BuiltIn(BuiltIn, Rc<Type>),
-}
-
-type Entry = Option<Def>;
 
 #[derive(Clone)]
 pub struct Dictionary {
-	defs: HashMap<Identifier, Vec<Entry>>,
+	builtins: HashMap<Identifier, BuiltIn>,
+	defs: HashMap<Identifier, Vec<Option<Term>>>,
 }
 
 impl Dictionary {
-	pub fn new(defs: &[(Identifier, Def)]) -> Self {
-		let mut map = HashMap::default();
+	pub fn new(env: &[(Identifier, BuiltIn)]) -> Self {
+		let mut builtins = HashMap::default();
 
-		for (k, v) in defs {
-			map.insert(*k, vec![Some(v.clone())]);
+		for (k, v) in env {
+			builtins.insert(*k, v.clone());
 		}
 
-		Self { defs: map }
+		Self {
+			builtins,
+			defs: HashMap::default(),
+		}
 	}
 
-	pub fn iter_defs(&self) -> impl Iterator<Item = (Identifier, &Def)> {
-		self.defs
-			.iter()
-			.filter_map(|(&k, v)| Some((k, v.last()?.as_ref()?)))
+	pub fn iter_builtins(&self) -> impl Iterator<Item = (&Identifier, &BuiltIn)> {
+		self.builtins.iter()
 	}
 
 	//Requires strong normalization
@@ -46,13 +41,20 @@ impl Dictionary {
 
 		match term {
 			Num(_) => (),
-			Var(v) => match self.query(v) {
-				Some(Def::Term(t)) => *term = t.clone(),
-				Some(Def::BuiltIn(BuiltIn { n_args, func }, _)) if *n_args == 0 => {
-					*term = func(&mut [])
+			Var(v) => {
+				if let Some(vec) = self.defs.get(v) {
+					if let Some(Some(t)) = vec.last() {
+						*term = t.clone();
+						return;
+					}
 				}
-				_ => (),
-			},
+
+				if let Some(BuiltIn { func, n_args, .. }) = self.builtins.get(v) {
+					if *n_args == 0 {
+						*term = func(&mut [])
+					}
+				}
+			}
 			Lam(v, b) => {
 				self.shadow(v);
 				self.execute(b);
@@ -80,7 +82,7 @@ impl Dictionary {
 					let mut x = terms.pop().unwrap();
 					self.execute(&mut x);
 
-					self.push_def(v, Def::Term(x));
+					self.push_def(v, x);
 					self.execute(&mut b);
 					self.pop_def(v);
 					terms.push(*b);
@@ -118,10 +120,15 @@ impl Dictionary {
 						return Some(mono.clone());
 					}
 
-					match dict.query(v)? {
-						Def::Term(term) => dict.infer(term),
-						Def::BuiltIn(_, ty) => Some((**ty).clone()),
+					if let Some(vec) = dict.defs.get(v) {
+						if let Some(Some(t)) = vec.last() {
+							return dict.infer(t);
+						}
 					}
+
+					let BuiltIn { ty, .. } = dict.builtins.get(v)?;
+
+					Some((**ty).clone())
 				}
 				Term::Lam(v, b) => {
 					let newvar = vgen.cap_var();
@@ -177,18 +184,7 @@ impl Dictionary {
 
 		let mut subs = TypeSub::default();
 		let mut defs = Args::default();
-		let mut vgen = VarGen::default();
-
-		for (var, entry) in &self.defs {
-			vgen.retire(var);
-			for def in entry.iter().filter_map(|o| o.as_ref()) {
-				if let Def::BuiltIn(_, t) = def {
-					for var in t.vars() {
-						vgen.retire(var)
-					}
-				}
-			}
-		}
+		let mut vgen = self.vgen();
 
 		let params = (self, &mut subs, &mut defs, &mut vgen);
 		core(params, term)
@@ -206,8 +202,8 @@ impl Dictionary {
 
 		let n = terms.len() - 1;
 
-		match self.query(ident) {
-			Some(Def::BuiltIn(BuiltIn { n_args, func }, _)) if *n_args <= n => {
+		match self.builtins.get(ident) {
+			Some(BuiltIn { n_args, func, .. }) if *n_args <= n => {
 				terms.pop();
 				let index = n - n_args;
 				let func = func.clone();
@@ -225,11 +221,6 @@ impl Dictionary {
 		}
 	}
 
-	pub fn query(&self, ident: Identifier) -> Option<&Def> {
-		let defs = self.defs.get(&ident)?;
-		defs.last()?.as_ref()
-	}
-
 	fn shadow(&mut self, ident: Identifier) {
 		let undef = None;
 		self.defs.entry(ident).or_default().push(undef);
@@ -239,24 +230,26 @@ impl Dictionary {
 		self.defs.get_mut(&ident).unwrap().pop();
 	}
 
-	fn push_def(&mut self, ident: Identifier, def: Def) {
+	fn push_def(&mut self, ident: Identifier, def: Term) {
 		let def = Some(def);
 		self.defs.entry(ident).or_default().push(def);
 	}
 
-	fn pop_def(&mut self, ident: Identifier) -> Def {
-		self.defs.get_mut(&ident).unwrap().pop().unwrap().unwrap()
+	fn pop_def(&mut self, ident: Identifier) {
+		let _ = self.defs.get_mut(&ident).unwrap().pop();
 	}
-}
 
-impl From<(BuiltIn, Type)> for Def {
-	fn from((func, ty): (BuiltIn, Type)) -> Self {
-		Self::BuiltIn(func, Rc::new(ty))
-	}
-}
+	pub fn vgen(&self) -> VarGen {
+		let mut vgen = VarGen::default();
 
-impl From<Term> for Def {
-	fn from(value: Term) -> Self {
-		Self::Term(value)
+		for var in self.builtins.keys() {
+			vgen.retire(var);
+		}
+
+		for var in self.defs.keys() {
+			vgen.retire(var);
+		}
+
+		vgen
 	}
 }
