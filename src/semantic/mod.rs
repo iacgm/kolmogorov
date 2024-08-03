@@ -253,24 +253,20 @@ impl Searcher {
 	}
 
 	fn vars_producing(&self, ty: &Type) -> VarsVec {
-		let valid = move |t: &Type| produces(t, ty);
-
 		let mut vec: VarsVec = self
 			.ctx
 			.iter()
-			.filter_map(
-				move |(&v, BuiltIn { ty: t, .. })| {
-					if valid(t) {
-						Some((v, t.clone()))
-					} else {
-						None
-					}
-				},
-			)
+			.filter_map(move |(&v, BuiltIn { ty: t, .. })| {
+				if produces(t, ty) {
+					Some((v, t.clone()))
+				} else {
+					None
+				}
+			})
 			.collect();
 
 		vec.extend(self.arg_vars.iter().filter_map(move |(v, t)| {
-			if valid(t) {
+			if produces(t, ty) {
 				Some((*v, t.clone()))
 			} else {
 				None
@@ -289,9 +285,10 @@ impl Iterator for Searcher {
 }
 
 fn produces(ty: &Type, target: &Type) -> bool {
-	target == ty
-		|| match ty {
-			Type::Fun(_, r) => produces(r, target),
-			_ => false,
-		}
+	let ret_ty_produces = match ty {
+		Type::Fun(_, r) => produces(r, target),
+		_ => false,
+	};
+
+	ret_ty_produces || target == ty
 }
