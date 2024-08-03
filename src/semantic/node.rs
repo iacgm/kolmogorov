@@ -13,7 +13,7 @@ pub struct SearchNode {
 }
 
 type VarDef = (Identifier, Rc<Type>);
-pub type VarsVec = SmallVec<[VarDef; 4]>;
+pub type VarsVec = SmallVec<[VarDef; 5]>;
 
 //Top level search phases
 #[derive(Clone, Debug)]
@@ -28,7 +28,7 @@ pub enum NodeKind {
 	All(Phase),
 	ArgTo(Stack<Term>, Rc<Type>),
 	HeadVars(VarsVec),
-	Abs(Identifier),
+	Abstract,
 }
 
 pub const START_KIND : NodeKind = All(Phase::Body);
@@ -40,7 +40,7 @@ impl Debug for NodeKind {
 			All(b) => write!(f, "All({:?})", b),
 			ArgTo(s, t) => write!(f, "ArgTo({:?}, {})", s, t),
 			HeadVars(vs) => write!(f, "Vars({:?})", vs),
-			Abs(v) => write!(f, "Abs({:?})", v),
+			Abstract => write!(f, "Abstract"),
 		}
 	}
 }

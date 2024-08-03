@@ -19,8 +19,12 @@ use node::*;
 
 use super::*;
 
+use rustc_hash::FxHashSet as HashSet;
 use std::rc::Rc;
 use NodeKind::*;
+
+//Used to store paths that are known to be empty
+type EmptyCache = HashSet<(Rc<Type>, usize)>;
 
 //A series of applied terms, annotated with type
 pub struct Searcher {
@@ -28,6 +32,7 @@ pub struct Searcher {
 	vgen: VarGen,
 	calls: Vec<SearchNode>,
 	arg_vars: Vec<(Identifier, Rc<Type>)>,
+	known_empty: Vec<EmptyCache>,
 }
 
 impl Searcher {
@@ -44,6 +49,7 @@ impl Searcher {
 				kind: START_KIND,
 			}],
 			arg_vars: vec![],
+			known_empty: Default::default(),
 		}
 	}
 
@@ -104,13 +110,11 @@ impl Searcher {
 				*next = Some(len);
 				*kind = All(Completed);
 
-				let ident = self.vgen.small_var();
-
 				let node = SearchNode {
 					targ: targ.clone(),
 					size: *size,
 					next: None,
-					kind: Abs(ident),
+					kind: Abstract,
 				};
 				self.calls.push(node);
 
@@ -121,33 +125,32 @@ impl Searcher {
 				None
 			}
 
-			Abs(ident) if n == len - 1 => {
-				let ident = *ident;
-				let Type::Fun(arg, ret) = &**targ else {
-					self.vgen.freshen(ident);
+			Abstract if n == len - 1 => {
+				let Type::Fun(arg, ret) = (**targ).clone() else {
 					self.calls.pop();
 					return None;
 				};
 
+				let size = *size;
+				self.introduce_var(arg);
+
 				let node = SearchNode {
 					targ: ret.clone(),
-					size: *size - 1,
+					size: size - 1,
 					next: None,
 					kind: START_KIND,
 				};
-
-				self.arg_vars.push((ident, arg.clone()));
 
 				self.calls.push(node);
 
 				None
 			}
 
-			Abs(ident) => {
-				let ident = *ident;
+			Abstract => {
+				let ident = self.arg_vars.last().unwrap().0;
 
 				let Some(body) = self.next_at(n + 1) else {
-					self.vgen.freshen(ident);
+					self.eliminate_var();
 					self.calls.pop();
 					return None;
 				};
@@ -274,6 +277,16 @@ impl Searcher {
 		}));
 
 		vec
+	}
+
+	fn introduce_var(&mut self, ty: Rc<Type>) {
+		let ident = self.vgen.small_var();
+		self.arg_vars.push((ident, ty.clone()));
+	}
+
+	fn eliminate_var(&mut self) {
+		let (ident, _) = self.arg_vars.pop().unwrap();
+		self.vgen.freshen(ident);
 	}
 }
 
