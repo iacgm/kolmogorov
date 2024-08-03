@@ -12,27 +12,21 @@ pub struct BuiltIn {
 }
 
 #[derive(Clone)]
-pub struct Dictionary {
-	builtins: HashMap<Identifier, BuiltIn>,
+pub struct Environment {
+	ctx: Context,
 	defs: HashMap<Identifier, Vec<Option<Term>>>,
 }
 
-impl Dictionary {
-	pub fn new(env: &[(Identifier, BuiltIn)]) -> Self {
-		let mut builtins = HashMap::default();
-
-		for (k, v) in env {
-			builtins.insert(*k, v.clone());
-		}
-
+impl Environment {
+	pub fn new(ctx: Context) -> Self {
 		Self {
-			builtins,
+			ctx,
 			defs: HashMap::default(),
 		}
 	}
 
 	pub fn iter_builtins(&self) -> impl Iterator<Item = (&Identifier, &BuiltIn)> {
-		self.builtins.iter()
+		self.ctx.iter()
 	}
 
 	//Requires strong normalization
@@ -49,7 +43,7 @@ impl Dictionary {
 					}
 				}
 
-				if let Some(BuiltIn { func, n_args, .. }) = self.builtins.get(v) {
+				if let Some(BuiltIn { func, n_args, .. }) = self.ctx.get(v) {
 					if *n_args == 0 {
 						*term = func(&mut [])
 					}
@@ -109,7 +103,7 @@ impl Dictionary {
 		type Args = HashMap<Identifier, Type>;
 
 		fn core(
-			params: (&Dictionary, &mut TypeSub, &mut Args, &mut VarGen),
+			params: (&Environment, &mut TypeSub, &mut Args, &mut VarGen),
 			term: &Term,
 		) -> Option<Type> {
 			let (dict, subs, defs, vgen) = params;
@@ -126,7 +120,7 @@ impl Dictionary {
 						}
 					}
 
-					let BuiltIn { ty, .. } = dict.builtins.get(v)?;
+					let BuiltIn { ty, .. } = dict.ctx.get(v)?;
 
 					Some((**ty).clone())
 				}
@@ -190,6 +184,16 @@ impl Dictionary {
 		core(params, term)
 	}
 
+	pub fn vgen(&self) -> VarGen {
+		let mut vgen = self.ctx.vgen();
+
+		for var in self.defs.keys() {
+			vgen.retire(var);
+		}
+
+		vgen
+	}
+
 	fn reduce(&mut self, terms: &mut Vec<Term>) -> bool {
 		use Term::*;
 
@@ -202,7 +206,7 @@ impl Dictionary {
 
 		let n = terms.len() - 1;
 
-		match self.builtins.get(ident) {
+		match self.ctx.get(ident) {
 			Some(BuiltIn { n_args, func, .. }) if *n_args <= n => {
 				terms.pop();
 				let index = n - n_args;
@@ -237,19 +241,5 @@ impl Dictionary {
 
 	fn pop_def(&mut self, ident: Identifier) {
 		let _ = self.defs.get_mut(&ident).unwrap().pop();
-	}
-
-	pub fn vgen(&self) -> VarGen {
-		let mut vgen = VarGen::default();
-
-		for var in self.builtins.keys() {
-			vgen.retire(var);
-		}
-
-		for var in self.defs.keys() {
-			vgen.retire(var);
-		}
-
-		vgen
 	}
 }

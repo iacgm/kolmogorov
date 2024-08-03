@@ -24,17 +24,19 @@ use NodeKind::*;
 
 //A series of applied terms, annotated with type
 pub struct Searcher {
-	dict: Dictionary,
+	ctx: Context,
 	vgen: VarGen,
 	calls: Vec<SearchNode>,
 	arg_vars: Vec<(Identifier, Rc<Type>)>,
 }
 
 impl Searcher {
-	pub fn search(dict: &Dictionary, targ: &Type, size: usize) -> Self {
+	pub fn search(ctx: Context, targ: &Type, size: usize) -> Self {
+		let vgen = ctx.vgen();
+
 		Searcher {
-			dict: dict.clone(),
-			vgen: dict.vgen(),
+			ctx,
+			vgen,
 			calls: vec![SearchNode {
 				targ: targ.clone().into(),
 				size,
@@ -254,8 +256,8 @@ impl Searcher {
 		let valid = move |t: &Type| produces(t, ty);
 
 		let mut vec: VarsVec = self
-			.dict
-			.iter_builtins()
+			.ctx
+			.iter()
 			.filter_map(
 				move |(&v, BuiltIn { ty: t, .. })| {
 					if valid(t) {

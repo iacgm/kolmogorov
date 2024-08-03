@@ -1,9 +1,11 @@
-pub mod dictionary;
+pub mod env;
+pub mod context; 
 pub mod parser;
 pub mod types;
 pub mod vars;
 
-pub use dictionary::*;
+pub use env::*;
+pub use context::*;
 pub use parser::*;
 pub use types::*;
 pub use vars::*;

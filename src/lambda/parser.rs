@@ -64,11 +64,20 @@ macro_rules! builtin {
 }
 
 #[macro_export]
-macro_rules! dict {
+macro_rules! context {
 	{$($def:ident),*} => {
-		Dictionary::new(&[$(
+		Context::new(&[$(
 			(stringify!($def), $def.clone())
 		),*])
+	}
+}
+
+#[macro_export]
+macro_rules! dict {
+	{$($def:ident),*} => {
+		Environment::new($crate::context!{
+			$($def),*
+		})
 	};
 }
 

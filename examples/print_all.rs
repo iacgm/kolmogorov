@@ -22,14 +22,14 @@ fn main() {
 		| | => Num(1)
 	);
 
-	let dict = dict! { plus, mult, zero, one };
+	let ctx = context! { plus, mult, zero, one };
 
 	let ty = ty!(N => N);
 
 	for n in 2.. {
 		let start = std::time::Instant::now();
 
-		let searcher = Searcher::search(&dict, &ty, n);
+		let searcher = Searcher::search(ctx.clone(), &ty, n);
 
 		let mut count = 0;
 
