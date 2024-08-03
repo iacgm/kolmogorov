@@ -41,7 +41,7 @@ impl Searcher {
 				targ: targ.clone().into(),
 				size,
 				next: None,
-				kind: All(Phase::Body),
+				kind: START_KIND,
 			}],
 			arg_vars: vec![],
 		}
@@ -133,7 +133,7 @@ impl Searcher {
 					targ: ret.clone(),
 					size: *size - 1,
 					next: None,
-					kind: NodeKind::All(Body),
+					kind: START_KIND,
 				};
 
 				self.arg_vars.push((ident, arg.clone()));
@@ -197,7 +197,7 @@ impl Searcher {
 					targ: arg.clone(),
 					size: *size - 1,
 					next: None,
-					kind: NodeKind::All(Body),
+					kind: START_KIND,
 				};
 
 				self.calls.push(node);
@@ -228,7 +228,7 @@ impl Searcher {
 								targ: arg_ty.clone(),
 								size: arg_size - 1,
 								next: None,
-								kind: All(Body),
+								kind: START_KIND,
 							};
 							self.calls.push(node);
 						}

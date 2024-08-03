@@ -31,6 +31,8 @@ pub enum NodeKind {
 	Abs(Identifier),
 }
 
+pub const START_KIND : NodeKind = All(Phase::Body);
+
 impl Debug for NodeKind {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		use NodeKind::*;
