@@ -4,7 +4,7 @@ use smallvec::SmallVec;
 use std::fmt::Debug;
 use std::rc::Rc;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct SearchNode {
 	pub targ: Rc<Type>,      //Target type
 	pub size: usize,         //Size
@@ -13,7 +13,7 @@ pub struct SearchNode {
 }
 
 type VarDef = (Identifier, Rc<Type>);
-pub type VarsVec = SmallVec<[VarDef; 5]>;
+pub type VarsVec = SmallVec<[VarDef; 4]>;
 
 //Top level search phases
 #[derive(Clone, Debug)]

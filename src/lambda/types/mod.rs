@@ -6,7 +6,7 @@ use super::*;
 use rustc_hash::FxHashMap as HashMap;
 use std::rc::Rc;
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub enum Type {
 	Int,
 	Var(Identifier),

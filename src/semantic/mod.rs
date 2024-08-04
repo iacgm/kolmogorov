@@ -14,17 +14,15 @@ Rules that could be used to prune search tree are:
 	> Unnecessary repetition (folds on constant functions, for example)
 */
 
+mod cache;
 mod node;
+use cache::*;
 use node::*;
 
 use super::*;
 
-use rustc_hash::FxHashSet as HashSet;
 use std::rc::Rc;
 use NodeKind::*;
-
-//Used to store paths that are known to be empty
-type EmptyCache = HashSet<(Rc<Type>, usize)>;
 
 //A series of applied terms, annotated with type
 pub struct Searcher {
@@ -32,7 +30,7 @@ pub struct Searcher {
 	vgen: VarGen,
 	calls: Vec<SearchNode>,
 	arg_vars: Vec<(Identifier, Rc<Type>)>,
-	known_empty: Vec<EmptyCache>,
+	cache: Cache,
 }
 
 impl Searcher {
@@ -49,7 +47,7 @@ impl Searcher {
 				kind: START_KIND,
 			}],
 			arg_vars: vec![],
-			known_empty: Default::default(),
+			cache: Cache::new(),
 		}
 	}
 
@@ -67,6 +65,7 @@ impl Searcher {
 
 	fn try_next_at(&mut self, n: usize) -> Option<Term> {
 		let len = self.calls.len();
+		let node = self.calls[n].clone();
 
 		let SearchNode {
 			targ,
@@ -88,6 +87,17 @@ impl Searcher {
 		use Phase::*;
 		match kind {
 			All(Body) => {
+				if self.cache.prune(&node) {
+					//println!("Pruned {} of size {}.", &node.targ, node.size);
+					self.calls.pop();
+					return None;
+				}
+
+				if *size == 0 {
+					self.calls.pop();
+					return None;
+				}
+
 				*next = Some(len);
 				*kind = All(Abstraction);
 
@@ -102,9 +112,12 @@ impl Searcher {
 					next: None,
 					kind: HeadVars(vars),
 				};
+
+				self.cache.begin_search(&node);
+
 				self.calls.push(node);
 
-				self.next_at(n + 1)
+				self.try_next_at(n + 1)
 			}
 			All(Abstraction) => {
 				*next = Some(len);
@@ -118,9 +131,10 @@ impl Searcher {
 				};
 				self.calls.push(node);
 
-				self.next_at(n + 1)
+				self.try_next_at(n + 1)
 			}
 			All(Completed) => {
+				self.cache.end_search();
 				self.calls.pop();
 				None
 			}
@@ -145,7 +159,6 @@ impl Searcher {
 
 				None
 			}
-
 			Abstract => {
 				let ident = self.arg_vars.last().unwrap().0;
 
@@ -155,7 +168,9 @@ impl Searcher {
 					return None;
 				};
 
-				Some(Term::Lam(ident, Box::new(body)))
+				let output = Term::Lam(ident, Box::new(body));
+
+				self.cache.try_yield(output)
 			}
 
 			HeadVars(_) if *size == 0 => {
@@ -185,7 +200,7 @@ impl Searcher {
 				if *size == 0 && l_ty == targ {
 					let term = apps.build_term();
 					self.calls.pop();
-					return Some(term);
+					return self.cache.try_yield(term);
 				} else if *size == 0 || l_ty == targ {
 					self.calls.pop();
 					return None;
@@ -282,11 +297,25 @@ impl Searcher {
 	fn introduce_var(&mut self, ty: Rc<Type>) {
 		let ident = self.vgen.small_var();
 		self.arg_vars.push((ident, ty.clone()));
+
+		let is_new = !self.contains_var_of_ty(&ty);
+		self.cache.intro_var(is_new);
 	}
 
 	fn eliminate_var(&mut self) {
 		let (ident, _) = self.arg_vars.pop().unwrap();
 		self.vgen.freshen(ident);
+		self.cache.elim_var();
+	}
+
+	fn contains_var_of_ty(&self, ty: &Rc<Type>) -> bool {
+		for (_, builtin) in self.ctx.iter() {
+			if builtin.ty == *ty {
+				return true;
+			}
+		}
+
+		false
 	}
 }
 
