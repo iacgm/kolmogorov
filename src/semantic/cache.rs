@@ -41,12 +41,10 @@ impl Cache {
 
 	pub fn prune_arg(&self, targ: &Rc<Type>, l_ty: &Rc<Type>, size: usize) -> bool {
 		fn core(cache: &Cache, targ: &Rc<Type>, l_ty: &Rc<Type>, size: usize) -> bool {
-			if size == 0 {
-				return l_ty != targ;
-			}
-
-			if l_ty == targ {
-				return true;
+			let last = l_ty == targ;
+			
+			if size == 0 || last {
+				return !(size == 0 && last)
 			}
 
 			let Type::Fun(arg, ret) = &**l_ty else {
@@ -60,23 +58,11 @@ impl Cache {
 	}
 
 	pub fn begin_search(&mut self, node: &SearchNode) {
-		/* 		for _ in 0..self.searches.len() {
-				   print!("\t");
-			   }
-
-			   println!("Searching for {} of size {}", node.targ, node.size);
-		*/
 		self.searches
 			.push((node.targ.clone(), node.size, SearchResult::NotFound));
 	}
 
 	pub fn yield_term(&mut self, term: Term, size: usize) -> Option<Term> {
-		/* 		for _ in 0..self.searches.len() {
-				   print!("\t");
-			   }
-
-			   println!("Found: {}", term);
-		*/
 		for (_, search_size, res) in self.searches.iter_mut() {
 			if *search_size == size {
 				*res = SearchResult::Inhabited;
@@ -92,12 +78,6 @@ impl Cache {
 		if res == SearchResult::NotFound {
 			self.active_cache_mut().insert((ty, size));
 		}
-
-		/* 		for _ in 0..self.searches.len() {
-			print!("\t");
-		}
-
-		println!("Search ended: {:?}", self.active_cache()); */
 	}
 
 	fn active_cache(&self) -> &EmptyPaths {

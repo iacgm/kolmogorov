@@ -87,7 +87,6 @@ impl Searcher {
 		match kind {
 			All(Body) => {
 				if self.cache.prune(targ, *size) {
-					//println!("Pruned {} of size {}.", &node.targ, node.size);
 					self.calls.pop();
 					return None;
 				}
@@ -212,14 +211,14 @@ impl Searcher {
 					return None;
 				}
 
-				let Type::Fun(arg, _) = &**l_ty else {
+				let Type::Fun(arg, ret) = &**l_ty else {
 					self.calls.pop();
 					return None;
 				};
 
 				let node = SearchNode {
 					targ: arg.clone(),
-					size: *size - 1,
+					size: if ret == targ { *size - 1 } else { 1 },
 					next: None,
 					kind: START_KIND,
 				};
@@ -243,14 +242,14 @@ impl Searcher {
 					let arg_size = self.calls[n + 1].size;
 					match self.next_at(n + 1) {
 						Some(arg) => break (arg, arg_size),
-						None if arg_size == 0 || ret == targ => {
+						None if arg_size == size - 1 => {
 							self.calls.pop();
 							return None;
 						}
 						None => {
 							let node = SearchNode {
 								targ: arg_ty.clone(),
-								size: arg_size - 1,
+								size: arg_size + 1,
 								next: None,
 								kind: START_KIND,
 							};
