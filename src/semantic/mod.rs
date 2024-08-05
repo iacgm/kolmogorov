@@ -65,7 +65,6 @@ impl Searcher {
 
 	fn try_next_at(&mut self, n: usize) -> Option<Term> {
 		let len = self.calls.len();
-		let node = self.calls[n].clone();
 
 		let SearchNode {
 			targ,
@@ -87,7 +86,7 @@ impl Searcher {
 		use Phase::*;
 		match kind {
 			All(Body) => {
-				if self.cache.prune(&node) {
+				if self.cache.prune(targ, *size) {
 					//println!("Pruned {} of size {}.", &node.targ, node.size);
 					self.calls.pop();
 					return None;
@@ -160,6 +159,7 @@ impl Searcher {
 				None
 			}
 			Abstract => {
+				let size = *size;
 				let ident = self.arg_vars.last().unwrap().0;
 
 				let Some(body) = self.next_at(n + 1) else {
@@ -170,7 +170,7 @@ impl Searcher {
 
 				let output = Term::Lam(ident, Box::new(body));
 
-				self.cache.try_yield(output)
+				self.cache.yield_term(output, size)
 			}
 
 			HeadVars(_) if *size == 0 => {
@@ -197,10 +197,16 @@ impl Searcher {
 			}
 
 			ArgTo(apps, l_ty) if n == len - 1 => {
+				if self.cache.prune_arg(targ, l_ty, *size) {
+					self.calls.pop();
+					return None;
+				}
+
 				if *size == 0 && l_ty == targ {
 					let term = apps.build_term();
 					self.calls.pop();
-					return self.cache.try_yield(term);
+					let size = term.size();
+					return self.cache.yield_term(term, size);
 				} else if *size == 0 || l_ty == targ {
 					self.calls.pop();
 					return None;

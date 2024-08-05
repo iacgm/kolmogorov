@@ -27,7 +27,7 @@ impl Cache {
 		}
 	}
 
-	pub fn intro_var(&mut self, is_new: bool) {
+	pub fn intro_var(&mut self, _is_new: bool) {
 		self.empties_stack.push(Default::default());
 	}
 
@@ -35,19 +35,50 @@ impl Cache {
 		self.empties_stack.pop();
 	}
 
-	pub fn prune(&self, node: &SearchNode) -> bool {
-		self.active_cache()
-			.contains(&(node.targ.clone(), node.size))
+	pub fn prune(&self, targ: &Rc<Type>, size: usize) -> bool {
+		self.active_cache().contains(&(targ.clone(), size))
+	}
+
+	pub fn prune_arg(&self, targ: &Rc<Type>, l_ty: &Rc<Type>, size: usize) -> bool {
+		fn core(cache: &Cache, targ: &Rc<Type>, l_ty: &Rc<Type>, size: usize) -> bool {
+			if size == 0 {
+				return l_ty != targ;
+			}
+
+			if l_ty == targ {
+				return true;
+			}
+
+			let Type::Fun(arg, ret) = &**l_ty else {
+				unreachable!()
+			};
+
+			(1..size).all(|n| cache.prune(arg, n) || core(cache, targ, ret, size - n - 1))
+		}
+
+		core(self, targ, l_ty, size)
 	}
 
 	pub fn begin_search(&mut self, node: &SearchNode) {
+		/* 		for _ in 0..self.searches.len() {
+				   print!("\t");
+			   }
+
+			   println!("Searching for {} of size {}", node.targ, node.size);
+		*/
 		self.searches
 			.push((node.targ.clone(), node.size, SearchResult::NotFound));
 	}
 
-	pub fn try_yield(&mut self, term: Term) -> Option<Term> {
-		for (_, size, res) in self.searches.iter_mut() {
-			if *size == term.size() {
+	pub fn yield_term(&mut self, term: Term, size: usize) -> Option<Term> {
+		/* 		for _ in 0..self.searches.len() {
+				   print!("\t");
+			   }
+
+			   println!("Found: {}", term);
+		*/
+		for (_, search_size, res) in self.searches.iter_mut() {
+			if *search_size == size {
 				*res = SearchResult::Inhabited;
 			}
 		}
@@ -61,6 +92,12 @@ impl Cache {
 		if res == SearchResult::NotFound {
 			self.active_cache_mut().insert((ty, size));
 		}
+
+		/* 		for _ in 0..self.searches.len() {
+			print!("\t");
+		}
+
+		println!("Search ended: {:?}", self.active_cache()); */
 	}
 
 	fn active_cache(&self) -> &EmptyPaths {
