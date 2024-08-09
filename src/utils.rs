@@ -16,7 +16,7 @@ impl<T: Display> Debug for Stack<T> {
 	}
 }
 
-pub enum Node<T> {
+enum Node<T> {
 	Nil,
 	Cons(T, Stack<T>),
 }
