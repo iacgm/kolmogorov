@@ -178,12 +178,8 @@ impl Term {
 	pub fn applied_to(self, arg: Term) -> Self {
 		use Term::*;
 		match (self, arg) {
-			(App(ls), App(mut rs)) => {
-				rs.extend(ls);
-				App(rs)
-			}
-			(lhs, App(mut rs)) => {
-				rs.push(lhs);
+			(App(mut rs), arg) => {
+				rs.insert(0, arg);
 				App(rs)
 			}
 			(l, r) => App(vec![r, l]),

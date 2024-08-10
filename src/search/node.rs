@@ -13,7 +13,7 @@ pub(super) enum Node {
 		targ: Rc<Type>,
 		size: usize,
 		state: Option<Box<Node>>,
-		ident: Identifier,
+		ident: Option<Identifier>,
 	},
 	Var {
 		targ: Rc<Type>,
@@ -45,8 +45,6 @@ impl AllPhase {
 
 impl Node {
 	pub fn next(&mut self, search_ctxt: &mut SearchContext) -> Option<Term> {
-		//dbg!(&self);
-
 		use Node::*;
 		match self {
 			All {
@@ -79,11 +77,10 @@ impl Node {
 						}))
 					}
 					Abstraction => {
-						let ident = search_ctxt.vgen.small_var();
 						*phase = Completed;
 						*state = Some(Box::new(Abs {
 							targ: targ.clone(),
-							ident,
+							ident: None,
 							size,
 							state: None,
 						}))
@@ -103,17 +100,22 @@ impl Node {
 				state,
 			} => {
 				let Type::Fun(arg, ret) = &**targ else {
-					search_ctxt.args.pop();
-					search_ctxt.vgen.freshen(ident);
 					return None;
 				};
 
+				let ident = *ident.get_or_insert_with(|| {
+					let v = search_ctxt.vgen.small_var();
+					println!("Intro: {}", v);
+					v
+				});
+
 				if let Some(curr_state) = state {
 					return match curr_state.next(search_ctxt) {
-						Some(term) => Some(term),
+						Some(term) => Some(Term::Lam(ident, term.into())),
 						None => {
-							search_ctxt.args.pop();
+							search_ctxt.args.pop().unwrap();
 							search_ctxt.vgen.freshen(ident);
+							println!("Retire: {}", &ident);
 							None
 						}
 					};

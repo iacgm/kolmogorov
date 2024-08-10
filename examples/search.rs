@@ -33,8 +33,8 @@ fn main() {
 
 /* 		for term in searcher {
 			println!("FOUND: {}",term);
-		} */
-
+		}
+ */
 		let count: usize = searcher.count();
 
 		println!(
