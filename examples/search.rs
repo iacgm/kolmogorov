@@ -26,7 +26,7 @@ fn main() {
 
 	let ty = ty!(N => N);
 
-	for n in 1.. {
+	for n in 26.. {
 		let start = std::time::Instant::now();
 
 		let searcher = search::search(ctx.clone(), &ty, n);

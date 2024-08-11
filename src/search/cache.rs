@@ -1,42 +1,44 @@
 use super::*;
 
-use rustc_hash::FxHashSet as HashSet;
+use rustc_hash::FxHashMap as HashMap;
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 enum SearchResult {
 	#[default]
-	NotFound,
+	Unknown,
 	Inhabited,
+	Uninhabited,
 }
 
-// All empty (type, size)
-type EmptyPaths = HashSet<(Rc<Type>, usize)>;
+type Search = (Rc<Type>, usize);
+type PathDict = HashMap<Search, SearchResult>;
 
 pub struct Cache {
-	// Hashmaps representing paths known to be empty
-	empties_stack: Vec<EmptyPaths>,
-	//Currently open, uninhabited searches (by type & size)
-	searches: Vec<(Rc<Type>, usize, SearchResult)>,
+	paths: Vec<PathDict>,
+	searches: Vec<Search>,
 }
 
+use SearchResult::*;
 impl Cache {
 	pub fn new() -> Self {
 		Self {
-			empties_stack: vec![Default::default()],
+			paths: vec![Default::default()],
 			searches: vec![],
 		}
 	}
 
 	pub fn intro_var(&mut self, _is_new: bool) {
-		self.empties_stack.push(Default::default());
+		self.paths.push(Default::default());
 	}
 
 	pub fn elim_var(&mut self) {
-		self.empties_stack.pop();
+		self.paths.pop();
 	}
 
 	pub fn prune(&self, targ: &Rc<Type>, size: usize) -> bool {
-		self.active_cache().contains(&(targ.clone(), size))
+		let search = (targ.clone(), size);
+
+		self.active().get(&search) == Some(&Uninhabited)
 	}
 
 	pub fn prune_arg(&self, targ: &Rc<Type>, l_ty: &Rc<Type>, size: usize) -> bool {
@@ -58,31 +60,34 @@ impl Cache {
 	}
 
 	pub fn begin_search(&mut self, targ: &Rc<Type>, size: usize) {
-		self.searches
-			.push((targ.clone(), size, SearchResult::NotFound));
+		let search = (targ.clone(), size);
+
+		self.searches.push(search.clone());
+
+		self.active_mut().entry(search).or_insert(Unknown);
 	}
 
-	pub fn yield_term(&mut self, _term: &Term, size: usize) {
-		for (_, search_size, res) in self.searches.iter_mut() {
-			if *search_size == size {
-				*res = SearchResult::Inhabited;
-			}
-		}
+	pub fn yield_term(&mut self, targ: &Rc<Type>, size: usize) {
+		let search = (targ.clone(), size);
+
+		self.active_mut().insert(search, Inhabited);
 	}
 
 	pub fn end_search(&mut self) {
-		let (ty, size, res) = self.searches.pop().unwrap();
+		let search = self.searches.pop().unwrap();
 
-		if res == SearchResult::NotFound {
-			self.active_cache_mut().insert((ty, size));
+		let result = self.active_mut().get_mut(&search).unwrap();
+
+		if *result == Unknown {
+			*result = Uninhabited;
 		}
 	}
 
-	fn active_cache(&self) -> &EmptyPaths {
-		self.empties_stack.last().unwrap()
+	fn active(&self) -> &PathDict {
+		self.paths.last().unwrap()
 	}
 
-	fn active_cache_mut(&mut self) -> &mut EmptyPaths {
-		self.empties_stack.last_mut().unwrap()
+	fn active_mut(&mut self) -> &mut PathDict {
+		self.paths.last_mut().unwrap()
 	}
 }

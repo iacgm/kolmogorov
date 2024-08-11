@@ -45,9 +45,9 @@ impl AllPhase {
 
 impl Node {
 	pub fn next(&mut self, search_ctxt: &mut SearchContext) -> Option<Term> {
-		//dbg!(&self);
 		use Node::*;
 		loop {
+			//dbg!(&self);
 			match self {
 				All {
 					targ,
@@ -64,7 +64,7 @@ impl Node {
 					if let Some(curr_state) = state {
 						match curr_state.next(search_ctxt) {
 							Some(term) => {
-								search_ctxt.cache.yield_term(&term, size);
+								search_ctxt.cache.yield_term(targ, size);
 								return Some(term);
 							}
 							None => *state = None,
@@ -211,13 +211,15 @@ impl Node {
 						unreachable!()
 					};
 
+					if search_ctxt.cache.prune_arg(targ, app_ty, size) {
+						*done = true;
+						self.early_exit(search_ctxt);
+						return None;
+					}
+
 					let arg_state = match arg_state {
 						Some(arg_state) => arg_state,
 						None => {
-							if search_ctxt.cache.prune_arg(targ, app_ty, size) {
-								*done = true;
-								return None;
-							}
 							// If applying one arg yields target type, we skip straight to
 							// the largest possible arg. Otherwise start searching args of
 							// all sizes, starting from 1.
@@ -272,6 +274,35 @@ impl Node {
 						arg_state: None,
 						done: false,
 					}))
+				}
+			}
+		}
+	}
+
+	pub fn early_exit(&mut self, search_ctxt: &mut SearchContext) {
+		use Node::*;
+		match self {
+			All { state, .. } => {
+				if let Some(state) = state {
+					state.early_exit(search_ctxt);
+				}
+				search_ctxt.cache.end_search();
+			}
+			Abs { state, .. } | Var { state, .. } => {
+				if let Some(state) = state {
+					state.early_exit(search_ctxt);
+				}
+			}
+			Arg {
+				app_state,
+				arg_state,
+				..
+			} => {
+				if let Some(state) = app_state {
+					state.early_exit(search_ctxt);
+				}
+				if let Some(state) = arg_state {
+					state.early_exit(search_ctxt);
 				}
 			}
 		}
