@@ -3,7 +3,9 @@
 // iterator enumerator, (while making caching & other optimizations
 // easier to implement & maintain)
 
+mod cache;
 mod node;
+use cache::*;
 use node::*;
 
 use super::*;
@@ -17,6 +19,7 @@ pub fn search(ctxt: Context, targ: &Type, size: usize) -> Enumerator {
 			ctxt,
 			vgen,
 			args: vec![],
+			cache: Cache::new(),
 		},
 		root: Node::All {
 			targ: Rc::new(targ.clone()),
@@ -39,6 +42,7 @@ struct SearchContext {
 	vgen: VarGen,
 	// Variables from abstractions
 	args: VarsVec,
+	cache: Cache,
 }
 
 impl SearchContext {

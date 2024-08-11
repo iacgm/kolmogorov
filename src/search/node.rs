@@ -45,6 +45,7 @@ impl AllPhase {
 
 impl Node {
 	pub fn next(&mut self, search_ctxt: &mut SearchContext) -> Option<Term> {
+		//dbg!(&self);
 		use Node::*;
 		loop {
 			match self {
@@ -54,22 +55,31 @@ impl Node {
 					phase,
 					state,
 				} => {
-					if *size == 0 {
+					let size = *size;
+
+					if size == 0 {
 						return None;
 					}
 
 					if let Some(curr_state) = state {
 						match curr_state.next(search_ctxt) {
-							Some(term) => return Some(term),
+							Some(term) => {
+								search_ctxt.cache.yield_term(&term, size);
+								return Some(term);
+							}
 							None => *state = None,
 						};
 					}
 
-					let size = *size;
-
 					use AllPhase::*;
 					match phase {
 						Application => {
+							if search_ctxt.cache.prune(targ, size) {
+								return None;
+							}
+
+							search_ctxt.cache.begin_search(targ, size);
+
 							*phase = Abstraction;
 							*state = Some(Box::new(Var {
 								targ: targ.clone(),
@@ -88,6 +98,7 @@ impl Node {
 							}))
 						}
 						Completed => {
+							search_ctxt.cache.end_search();
 							return None;
 						}
 					};
@@ -111,12 +122,14 @@ impl Node {
 							None => {
 								search_ctxt.args.pop().unwrap();
 								search_ctxt.vgen.freshen(ident);
+								search_ctxt.cache.elim_var();
 								None
 							}
 						};
 					};
 
 					search_ctxt.args.push((ident, arg.clone()));
+					search_ctxt.cache.intro_var(false);
 
 					*state = Some(Box::new(All {
 						targ: ret.clone(),
@@ -170,16 +183,16 @@ impl Node {
 					app_ty,
 					done,
 				} => {
-					if *done {
-						return None;
-					}
-
 					if let Some(curr_state) = app_state {
 						match curr_state.next(search_ctxt) {
 							Some(term) => return Some(term),
 							None => *app_state = None,
 						};
 					};
+
+					if *done {
+						return None;
+					}
 
 					let size = *size;
 					if size == 1 {
@@ -190,6 +203,7 @@ impl Node {
 						*done = true;
 						return Some(apps.build_term());
 					} else if size == 0 || targ == app_ty {
+						*done = true;
 						return None;
 					}
 
@@ -197,19 +211,28 @@ impl Node {
 						unreachable!()
 					};
 
-					let arg_state = arg_state.get_or_insert_with(|| {
-						// If applying one arg yields target type, we skip straight to
-						// the largest possible arg. Otherwise start searching args of
-						// all sizes, starting from 1.
-						let arg_size = if ret_ty == targ { size - 1 } else { 1 };
+					let arg_state = match arg_state {
+						Some(arg_state) => arg_state,
+						None => {
+							if search_ctxt.cache.prune_arg(targ, app_ty, size) {
+								*done = true;
+								return None;
+							}
+							// If applying one arg yields target type, we skip straight to
+							// the largest possible arg. Otherwise start searching args of
+							// all sizes, starting from 1.
+							let arg_size = if ret_ty == targ { size - 1 } else { 1 };
 
-						Box::new(All {
-							targ: arg_ty.clone(),
-							size: arg_size,
-							state: None,
-							phase: AllPhase::START,
-						})
-					});
+							*arg_state = Some(Box::new(All {
+								targ: arg_ty.clone(),
+								size: arg_size,
+								state: None,
+								phase: AllPhase::START,
+							}));
+
+							arg_state.as_mut().unwrap()
+						}
+					};
 
 					// Get the next arg, trying every size until we generate one.
 					let (arg, arg_size) = loop {
@@ -228,13 +251,14 @@ impl Node {
 						match next_arg {
 							Some(arg) => break (arg, *arg_size),
 							None => {
+								if *arg_size == size - 1 {
+									*done = true;
+									return None;
+								}
+
 								*arg_size += 1;
 								*phase = AllPhase::START;
 								*state = None;
-
-								if *arg_size >= size {
-									return None;
-								}
 							}
 						}
 					};
