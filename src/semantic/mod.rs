@@ -103,6 +103,7 @@ impl Searcher {
 				let targ = targ.clone();
 
 				let vars = self.vars_producing(&targ);
+				self.cache.begin_search(&targ, size);
 
 				let node = SearchNode {
 					targ,
@@ -110,8 +111,6 @@ impl Searcher {
 					next: None,
 					kind: HeadVars(vars),
 				};
-
-				self.cache.begin_search(&node);
 
 				self.calls.push(node);
 
@@ -158,6 +157,7 @@ impl Searcher {
 				None
 			}
 			Abstract => {
+				let targ = targ.clone();
 				let size = *size;
 				let ident = self.arg_vars.last().unwrap().0;
 
@@ -167,9 +167,9 @@ impl Searcher {
 					return None;
 				};
 
-				let output = Term::Lam(ident, Box::new(body));
+				self.cache.yield_term(&targ, size);
 
-				self.cache.yield_term(output, size)
+				Some(Term::Lam(ident, Box::new(body)))
 			}
 
 			HeadVars(_) if *size == 0 => {
@@ -203,9 +203,10 @@ impl Searcher {
 
 				if *size == 0 && l_ty == targ {
 					let term = apps.build_term();
-					self.calls.pop();
 					let size = term.size();
-					return self.cache.yield_term(term, size);
+					self.cache.yield_term(targ, size);
+					self.calls.pop();
+					return Some(term);
 				} else if *size == 0 || l_ty == targ {
 					self.calls.pop();
 					return None;

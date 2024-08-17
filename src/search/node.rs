@@ -1,5 +1,6 @@
 use super::*;
 use std::rc::Rc;
+use SearchResult::*;
 
 #[derive(Debug)]
 pub(super) enum Node {
@@ -28,7 +29,7 @@ pub(super) enum Node {
 		app_state: Option<Box<Node>>,
 		app_ty: Rc<Type>,
 		arg_state: Option<Box<Node>>,
-		done: bool,
+		res: SearchResult,
 	},
 }
 
@@ -170,7 +171,7 @@ impl Node {
 						app_ty: v_ty,
 						app_state: None,
 						arg_state: None,
-						done: false,
+						res: Unknown,
 					}));
 				}
 
@@ -181,7 +182,7 @@ impl Node {
 					app_state,
 					apps,
 					app_ty,
-					done,
+					res,
 				} => {
 					if let Some(curr_state) = app_state {
 						match curr_state.next(search_ctxt) {
@@ -190,7 +191,7 @@ impl Node {
 						};
 					};
 
-					if *done {
+					if *res == Uninhabited {
 						return None;
 					}
 
@@ -200,10 +201,10 @@ impl Node {
 					}
 
 					if size == 0 && targ == app_ty {
-						*done = true;
+						*res = Uninhabited;
 						return Some(apps.build_term());
 					} else if size == 0 || targ == app_ty {
-						*done = true;
+						*res = Uninhabited;
 						return None;
 					}
 
@@ -211,10 +212,13 @@ impl Node {
 						unreachable!()
 					};
 
-					if search_ctxt.cache.prune_arg(targ, app_ty, size) {
-						*done = true;
-						self.early_exit(search_ctxt);
-						return None;
+					if *res == Unknown {
+						*res = search_ctxt.cache.prune_arg(targ, app_ty, size);
+						
+						if *res == Uninhabited {
+							self.early_exit(search_ctxt);
+							return None;
+						}
 					}
 
 					let arg_state = match arg_state {
@@ -254,7 +258,7 @@ impl Node {
 							Some(arg) => break (arg, *arg_size),
 							None => {
 								if *arg_size == size - 1 {
-									*done = true;
+									*res = Uninhabited;
 									return None;
 								}
 
@@ -272,7 +276,7 @@ impl Node {
 						app_state: None,
 						app_ty: ret_ty.clone(),
 						arg_state: None,
-						done: false,
+						res: Unknown,
 					}))
 				}
 			}
@@ -283,13 +287,13 @@ impl Node {
 		use Node::*;
 		match self {
 			All { state, .. } => {
-				if let Some(state) = state {
+				if let Some(state) = state.take().as_mut() {
 					state.early_exit(search_ctxt);
 				}
 				search_ctxt.cache.end_search();
 			}
 			Abs { state, .. } | Var { state, .. } => {
-				if let Some(state) = state {
+				if let Some(state) = state.take().as_mut() {
 					state.early_exit(search_ctxt);
 				}
 			}
@@ -298,10 +302,10 @@ impl Node {
 				arg_state,
 				..
 			} => {
-				if let Some(state) = app_state {
+				if let Some(state) = app_state.take().as_mut() {
 					state.early_exit(search_ctxt);
 				}
-				if let Some(state) = arg_state {
+				if let Some(state) = arg_state.take().as_mut() {
 					state.early_exit(search_ctxt);
 				}
 			}

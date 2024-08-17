@@ -3,7 +3,7 @@ use super::*;
 use rustc_hash::FxHashMap as HashMap;
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
-enum SearchResult {
+pub enum SearchResult {
 	#[default]
 	Unknown,
 	Inhabited,
@@ -41,22 +41,48 @@ impl Cache {
 		self.active().get(&search) == Some(&Uninhabited)
 	}
 
-	pub fn prune_arg(&self, targ: &Rc<Type>, l_ty: &Rc<Type>, size: usize) -> bool {
-		fn core(cache: &Cache, targ: &Rc<Type>, l_ty: &Rc<Type>, size: usize) -> bool {
+	pub fn prune_arg(&self, targ: &Rc<Type>, l_ty: &Rc<Type>, size: usize) -> SearchResult {
+		fn core(dict: &PathDict, targ: &Rc<Type>, l_ty: &Rc<Type>, size: usize) -> SearchResult {
 			let last = l_ty == targ;
 
+			if size == 0 && last {
+				return Inhabited;
+			}
+
 			if size == 0 || last {
-				return !(size == 0 && last);
+				return Uninhabited;
 			}
 
 			let Type::Fun(arg, ret) = &**l_ty else {
 				unreachable!()
 			};
 
-			(1..size).all(|n| cache.prune(arg, n) || core(cache, targ, ret, size - n - 1))
+			let mut res = Uninhabited;
+			for n in 1..size {
+				let search = (arg.clone(), n);
+				let arg_res = *dict.get(&search).unwrap_or(&Unknown);
+
+				if arg_res == Uninhabited {
+					continue;
+				}
+
+				let rest = core(dict, targ, ret, size - n - 1);
+
+				if arg_res == Unknown && matches!(rest, Unknown | Inhabited) {
+					res = Unknown;
+					continue;
+				}
+
+				if arg_res == Inhabited && rest == Inhabited {
+					res = Inhabited;
+					break;
+				}
+			}
+
+			res
 		}
 
-		core(self, targ, l_ty, size)
+		core(self.active(), targ, l_ty, size)
 	}
 
 	pub fn begin_search(&mut self, targ: &Rc<Type>, size: usize) {
