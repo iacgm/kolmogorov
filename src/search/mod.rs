@@ -35,7 +35,8 @@ pub struct Enumerator {
 	root: Node,
 }
 
-type VarsVec = Vec<(Identifier, Rc<Type>)>;
+type VarDecl = (Identifier, Rc<Type>);
+type VarsVec = Vec<VarDecl>;
 
 struct SearchContext {
 	ctxt: Context,
@@ -46,6 +47,13 @@ struct SearchContext {
 }
 
 impl SearchContext {
+	fn contains_var_of_type(&self, ty: &Rc<Type>) -> bool {
+		let args = self.args.iter().map(|(_, t)| t);
+		let ctxt = self.ctxt.iter().map(|(_, b)| &b.ty);
+
+		args.chain(ctxt).any(|v_ty| v_ty == ty)
+	}
+
 	fn vars_producing(&mut self, targ: &Rc<Type>) -> VarsVec {
 		fn produces(ty: &Type, target: &Type) -> bool {
 			let ret_ty_produces = match ty {

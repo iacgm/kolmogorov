@@ -14,25 +14,33 @@ type Search = (Rc<Type>, usize);
 type PathDict = HashMap<Search, SearchResult>;
 
 pub struct Cache {
-	paths: Vec<PathDict>,
 	searches: Vec<Search>,
+	paths: Vec<PathDict>,
+	//Top element indicates whether pathdict should be popped. 
+	pops: Vec<bool>,
 }
 
 use SearchResult::*;
 impl Cache {
 	pub fn new() -> Self {
 		Self {
-			paths: vec![Default::default()],
 			searches: vec![],
+			paths: vec![Default::default()],
+			pops: vec![],
 		}
 	}
 
-	pub fn intro_var(&mut self, _is_new: bool) {
-		self.paths.push(Default::default());
+	pub fn intro_var(&mut self, is_new: bool) {
+		if is_new {
+			self.paths.push(Default::default());
+		}
+		self.pops.push(is_new);
 	}
 
 	pub fn elim_var(&mut self) {
-		self.paths.pop();
+		if self.pops.pop().unwrap() {
+			self.paths.pop();
+		}
 	}
 
 	pub fn prune(&self, targ: &Rc<Type>, size: usize) -> bool {

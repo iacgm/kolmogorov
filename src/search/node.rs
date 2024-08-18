@@ -130,7 +130,9 @@ impl Node {
 					};
 
 					search_ctxt.args.push((ident, arg.clone()));
-					search_ctxt.cache.intro_var(false);
+
+					let is_new = !search_ctxt.contains_var_of_type(arg);
+					search_ctxt.cache.intro_var(is_new);
 
 					*state = Some(Box::new(All {
 						targ: ret.clone(),
@@ -214,7 +216,7 @@ impl Node {
 
 					if *res == Unknown {
 						*res = search_ctxt.cache.prune_arg(targ, app_ty, size);
-						
+
 						if *res == Uninhabited {
 							self.early_exit(search_ctxt);
 							return None;
