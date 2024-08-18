@@ -186,16 +186,16 @@ impl Node {
 					app_ty,
 					res,
 				} => {
+					if *res == Uninhabited {
+						return None;
+					}
+
 					if let Some(curr_state) = app_state {
 						match curr_state.next(search_ctxt) {
 							Some(term) => return Some(term),
 							None => *app_state = None,
 						};
 					};
-
-					if *res == Uninhabited {
-						return None;
-					}
 
 					let size = *size;
 					if size == 1 {
