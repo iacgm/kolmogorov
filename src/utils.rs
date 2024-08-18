@@ -11,23 +11,23 @@ impl<T: Display> Debug for Stack<T> {
 		use Node::*;
 		match &*self.0 {
 			Nil => Ok(()),
-			Cons(h, t) => write!(f, "{:?}:{}", t, h),
+			Cons(t, h) => write!(f, "{:?}:{}", t, h),
 		}
 	}
 }
 
 enum Node<T> {
 	Nil,
-	Cons(T, Stack<T>),
+	Cons(Stack<T>, T),
 }
 
 impl<T> Stack<T> {
 	pub fn one(v: T) -> Self {
-		Node::Cons(v, Node::Nil.into()).into()
+		Node::Cons(Node::Nil.into(), v).into()
 	}
 
 	pub fn cons(&self, v: T) -> Self {
-		Node::Cons(v, Stack(self.0.clone())).into()
+		Node::Cons(Stack(self.0.clone()), v).into()
 	}
 
 	pub fn is_nil(&self) -> bool {
@@ -35,6 +35,21 @@ impl<T> Stack<T> {
 		match *self.0 {
 			Nil => true,
 			Cons(_, _) => false,
+		}
+	}
+
+	pub fn to_vec(&self) -> Vec<T>
+	where
+		T: Clone,
+	{
+		use Node::*;
+		match &*self.0 {
+			Nil => vec![],
+			Cons(t, h) => {
+				let mut v = t.to_vec();
+				v.push(h.clone());
+				v
+			}
 		}
 	}
 }
@@ -50,10 +65,15 @@ impl Stack<Term> {
 	//returns the stack as a reversed vector
 	pub fn build_term(&self) -> Term {
 		use Node::*;
+
 		match &*self.0 {
 			Nil => unimplemented!(),
-			Cons(h, t) if t.is_nil() => h.clone(),
-			Cons(h, t) => t.build_term().applied_to(h.clone()),
+			Cons(t, h) if t.is_nil() => h.clone(),
+			Cons(_, _) => {
+				let mut v = self.to_vec();
+				v.reverse();
+				Term::App(v)
+			}
 		}
 	}
 }

@@ -6,7 +6,6 @@ pub mod vars;
 
 pub use env::*;
 pub use context::*;
-pub use parser::*;
 pub use types::*;
 pub use vars::*;
 

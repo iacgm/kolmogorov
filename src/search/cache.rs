@@ -96,7 +96,10 @@ impl Cache {
 	pub fn yield_term(&mut self, targ: &Rc<Type>, size: usize) {
 		let search = (targ.clone(), size);
 
-		self.active_mut().insert(search, Inhabited);
+		self.active_mut()
+			.entry(search)
+			.and_modify(|r| *r = Inhabited)
+			.or_insert(Inhabited);
 	}
 
 	pub fn end_search(&mut self) {
