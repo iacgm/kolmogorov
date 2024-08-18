@@ -16,6 +16,7 @@ impl<T: Display> Debug for Stack<T> {
 	}
 }
 
+#[derive(Clone)]
 enum Node<T> {
 	Nil,
 	Cons(Stack<T>, T),
@@ -63,14 +64,14 @@ impl<T> From<Node<T>> for Stack<T> {
 use super::lambda::Term;
 impl Stack<Term> {
 	//returns the stack as a reversed vector
-	pub fn build_term(&self) -> Term {
+	pub fn build_term(self) -> Term {
 		use Node::*;
-
-		match &*self.0 {
+		match Rc::unwrap_or_clone(self.0) {
 			Nil => unimplemented!(),
 			Cons(t, h) if t.is_nil() => h.clone(),
-			Cons(_, _) => {
-				let mut v = self.to_vec();
+			Cons(t, h) => {
+				let mut v = t.to_vec();
+				v.push(h);
 				v.reverse();
 				Term::App(v)
 			}

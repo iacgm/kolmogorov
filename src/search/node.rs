@@ -31,6 +31,7 @@ pub(super) enum Node {
 		arg_state: Option<Box<Node>>,
 		res: SearchResult,
 	},
+	Nil,
 }
 
 #[derive(Debug)]
@@ -112,6 +113,7 @@ impl Node {
 					state,
 				} => {
 					let Type::Fun(arg, ret) = &**targ else {
+						*self = Nil;
 						return None;
 					};
 
@@ -186,10 +188,6 @@ impl Node {
 					app_ty,
 					res,
 				} => {
-					if *res == Uninhabited {
-						return None;
-					}
-
 					if let Some(curr_state) = app_state {
 						match curr_state.next(search_ctxt) {
 							Some(term) => return Some(term),
@@ -199,14 +197,18 @@ impl Node {
 
 					let size = *size;
 					if size == 1 {
+						*self = Nil;
 						return None;
 					}
 
 					if size == 0 && targ == app_ty {
-						*res = Uninhabited;
+						let Arg { apps, .. } = std::mem::replace(self, Nil) else {
+							unreachable!()
+						};
+
 						return Some(apps.build_term());
 					} else if size == 0 || targ == app_ty {
-						*res = Uninhabited;
+						*self = Nil;
 						return None;
 					}
 
@@ -219,6 +221,7 @@ impl Node {
 
 						if *res == Uninhabited {
 							self.early_exit(search_ctxt);
+							*self = Nil;
 							return None;
 						}
 					}
@@ -260,7 +263,7 @@ impl Node {
 							Some(arg) => break (arg, *arg_size),
 							None => {
 								if *arg_size == size - 1 {
-									*res = Uninhabited;
+									*self = Nil;
 									return None;
 								}
 
@@ -281,6 +284,7 @@ impl Node {
 						res: Unknown,
 					}))
 				}
+				Nil => return None,
 			}
 		}
 	}
@@ -311,6 +315,7 @@ impl Node {
 					state.early_exit(search_ctxt);
 				}
 			}
+			Nil => {}
 		}
 	}
 }
