@@ -52,7 +52,7 @@ macro_rules! builtin {
 				let mut $arg = std::mem::replace($arg, $crate::Term::Num(0));
 			)*
 
-			$body
+			Some($body)
 		});
 
 		BuiltIn {

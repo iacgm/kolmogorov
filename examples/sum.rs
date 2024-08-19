@@ -8,7 +8,7 @@ fn main() {
 
 	let plus = builtin!(
 		N => N => N
-		|x, y| => Num(x.int()+y.int())
+		|x, y| => Num(x.int()?+y.int()?)
 	);
 
 	let mut dictionary = dict! {plus};

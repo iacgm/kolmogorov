@@ -2,7 +2,7 @@ use super::*;
 use rustc_hash::FxHashMap as HashMap;
 use std::rc::Rc;
 
-type BuiltInFunc = Rc<dyn Fn(&mut [Term]) -> Term>;
+type BuiltInFunc = Rc<dyn Fn(&mut [Term]) -> Option<Term>>;
 
 #[derive(Clone)]
 pub struct BuiltIn {
@@ -13,20 +13,20 @@ pub struct BuiltIn {
 
 #[derive(Clone)]
 pub struct Environment {
-	ctx: Context,
+	ctxt: Context,
 	defs: HashMap<Identifier, Vec<Option<Term>>>,
 }
 
 impl Environment {
-	pub fn new(ctx: Context) -> Self {
+	pub fn new(ctxt: Context) -> Self {
 		Self {
-			ctx,
+			ctxt,
 			defs: HashMap::default(),
 		}
 	}
 
 	pub fn iter_builtins(&self) -> impl Iterator<Item = (&Identifier, &BuiltIn)> {
-		self.ctx.iter()
+		self.ctxt.iter()
 	}
 
 	//Requires strong normalization
@@ -43,9 +43,9 @@ impl Environment {
 					}
 				}
 
-				if let Some(BuiltIn { func, n_args, .. }) = self.ctx.get(v) {
+				if let Some(BuiltIn { func, n_args, .. }) = self.ctxt.get(v) {
 					if *n_args == 0 {
-						*term = func(&mut [])
+						*term = func(&mut []).unwrap()
 					}
 				}
 			}
@@ -120,7 +120,7 @@ impl Environment {
 						}
 					}
 
-					let BuiltIn { ty, .. } = dict.ctx.get(v)?;
+					let BuiltIn { ty, .. } = dict.ctxt.get(v)?;
 
 					Some((**ty).clone())
 				}
@@ -185,7 +185,7 @@ impl Environment {
 	}
 
 	pub fn vgen(&self) -> VarGen {
-		let mut vgen = self.ctx.vgen();
+		let mut vgen = self.ctxt.vgen();
 
 		for var in self.defs.keys() {
 			vgen.retire(var);
@@ -206,9 +206,9 @@ impl Environment {
 
 		let n = terms.len() - 1;
 
-		match self.ctx.get(ident) {
+		match self.ctxt.get(ident) {
 			Some(BuiltIn { n_args, func, .. }) if *n_args <= n => {
-				terms.pop();
+				let head = terms.pop().unwrap();
 				let index = n - n_args;
 				let func = func.clone();
 
@@ -216,7 +216,11 @@ impl Environment {
 					self.execute(term);
 				}
 
-				let output = func(&mut terms[index..]);
+				let Some(output) = func(&mut terms[index..]) else {
+					terms.push(head);
+					return false;
+				};
+				
 				terms.truncate(index);
 				terms.push(output);
 				true

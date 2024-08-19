@@ -4,12 +4,12 @@ fn main() {
 	use Term::*;
 	let plus = builtin!(
 		N => N => N
-		|x, y| => Num(x.int()+y.int())
+		|x, y| => Num(x.int()? + y.int()?)
 	);
 
 	let mult = builtin!(
 		N => N => N
-		|x, y| => Num(x.int()*y.int())
+		|x, y| => Num(x.int()? * y.int()?)
 	);
 
 	let zero = builtin!(

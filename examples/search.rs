@@ -4,12 +4,12 @@ fn main() {
 	use Term::*;
 	let plus = builtin!(
 		N => N => N
-		|x, y| => Num(x.int()+y.int())
+		|x, y| => Num(x.int()? + y.int()?)
 	);
 
 	let mult = builtin!(
 		N => N => N
-		|x, y| => Num(x.int()*y.int())
+		|x, y| => Num(x.int()? * y.int()?)
 	);
 
 	let zero = builtin!(
@@ -31,10 +31,10 @@ fn main() {
 
 		let searcher = search::search(ctx.clone(), &ty, n);
 
-/* 		for term in searcher {
-			println!("FOUND: {}",term);
-		}
- */
+		/* 		for term in searcher {
+				   println!("FOUND: {}",term);
+			   }
+		*/
 		let count: usize = searcher.count();
 
 		println!(

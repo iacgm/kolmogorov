@@ -1,11 +1,11 @@
+pub mod context;
 pub mod env;
-pub mod context; 
 pub mod parser;
 pub mod types;
 pub mod vars;
 
-pub use env::*;
 pub use context::*;
+pub use env::*;
 pub use types::*;
 pub use vars::*;
 
@@ -186,10 +186,10 @@ impl Term {
 	}
 
 	//Convenient shorthand, especially useful for implementing builtins
-	pub fn int(&self) -> i32 {
-		match self {
-			Self::Num(n) => *n,
-			_ => unimplemented!(),
+	pub fn int(&self) -> Option<i32> {
+		match *self {
+			Self::Num(n) => Some(n),
+			_ => None,
 		}
 	}
 }
