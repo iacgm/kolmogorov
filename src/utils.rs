@@ -68,7 +68,7 @@ impl Stack<Term> {
 		use Node::*;
 		match Rc::unwrap_or_clone(self.0) {
 			Nil => unimplemented!(),
-			Cons(t, h) if t.is_nil() => h.clone(),
+			Cons(t, h) if t.is_nil() => h,
 			Cons(t, h) => {
 				let mut v = t.to_vec();
 				v.push(h);
