@@ -1,8 +1,15 @@
 use kolmogorov::*;
 
+mod contexts;
+use contexts::*;
+
+fn pow(n: i32) -> i32 {
+	2i32.pow(n as u32)
+}
+
 fn main() {
 	use Term::*;
-	let ctxt = context();
+	let ctxt = polynomials();
 	let targ = ty!(N => N => N);
 
 	let example = term!(p n -> mult p (plus one one));
@@ -36,34 +43,4 @@ fn main() {
 			return;
 		}
 	}
-}
-
-fn pow(n: i32) -> i32 {
-	2i32.pow(n as u32)
-}
-
-fn context() -> Context {
-	use Term::*;
-
-	let plus = builtin!(
-		N => N => N
-		|x, y| => Num(x.int()?+y.int()?)
-	);
-
-	let mult = builtin!(
-		N => N => N
-		|x, y| => Num(x.int()?*y.int()?)
-	);
-
-	let zero = builtin!(
-		N
-		| | => Num(0)
-	);
-
-	let one = builtin!(
-		N
-		| | => Num(1)
-	);
-
-	context! { plus, mult, zero, one }
 }

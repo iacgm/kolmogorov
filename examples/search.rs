@@ -1,29 +1,10 @@
 use kolmogorov::*;
 
+mod contexts;
+use contexts::*;
+
 fn main() {
-	use Term::*;
-	let plus = builtin!(
-		N => N => N
-		|x, y| => Num(x.int()? + y.int()?)
-	);
-
-	let mult = builtin!(
-		N => N => N
-		|x, y| => Num(x.int()? * y.int()?)
-	);
-
-	let zero = builtin!(
-		N
-		| | => Num(0)
-	);
-
-	let one = builtin!(
-		N
-		| | => Num(1)
-	);
-
-	let ctx = context! { plus, mult, zero, one };
-
+	let ctx = polynomials();
 	let ty = ty!(N => N);
 
 	for n in 2.. {
@@ -31,10 +12,6 @@ fn main() {
 
 		let searcher = search::search(ctx.clone(), &ty, n);
 
-		/* 		for term in searcher {
-				   println!("FOUND: {}",term);
-			   }
-		*/
 		let count: usize = searcher.count();
 
 		println!(

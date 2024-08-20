@@ -9,3 +9,7 @@ edition = "2021"
 mimalloc = { version = "*", features = ["secure"] }
 rustc-hash = "2.0.0"
 smallvec = "1.13"
+
+[profile.release]
+codegen-units = 1
+lto = false

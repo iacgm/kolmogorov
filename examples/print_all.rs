@@ -1,28 +1,10 @@
 use kolmogorov::*;
 
+mod contexts;
+use contexts::*;
+
 fn main() {
-	use Term::*;
-	let plus = builtin!(
-		N => N => N
-		|x, y| => Num(x.int()? + y.int()?)
-	);
-
-	let mult = builtin!(
-		N => N => N
-		|x, y| => Num(x.int()? * y.int()?)
-	);
-
-	let zero = builtin!(
-		N
-		| | => Num(0)
-	);
-
-	let one = builtin!(
-		N
-		| | => Num(1)
-	);
-
-	let ctx = context! { plus, mult, zero, one };
+	let ctx = polynomials();
 
 	let ty = ty!(N => N);
 

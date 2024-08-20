@@ -48,10 +48,6 @@ macro_rules! builtin {
 				unreachable!()
 			};
 
-			$(
-				let mut $arg = std::mem::replace($arg, $crate::Term::Num(0));
-			)*
-
 			Some($body)
 		});
 

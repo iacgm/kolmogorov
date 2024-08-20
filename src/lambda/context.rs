@@ -18,6 +18,12 @@ impl Context {
 		}
 	}
 
+	pub fn insert(&mut self, defs: &[(Identifier, BuiltIn)]) {
+		for (ident, def) in defs {
+			self.ctx.insert(ident, def.clone());
+		}
+	}
+
 	pub fn iter(&self) -> impl Iterator<Item = (&Identifier, &BuiltIn)> {
 		self.ctx.iter()
 	}

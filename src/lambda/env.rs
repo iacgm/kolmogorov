@@ -197,12 +197,11 @@ impl Environment {
 	fn reduce(&mut self, terms: &mut Vec<Term>) -> bool {
 		use Term::*;
 
-		let ident;
-		if let Some(Var(f)) = terms.last() {
-			ident = *f;
+		let ident = if let Some(Var(f)) = terms.last() {
+			*f
 		} else {
 			return false;
-		}
+		};
 
 		let n = terms.len() - 1;
 
@@ -220,7 +219,7 @@ impl Environment {
 					terms.push(head);
 					return false;
 				};
-				
+
 				terms.truncate(index);
 				terms.push(output);
 				true
