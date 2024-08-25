@@ -4,6 +4,7 @@ pub use subs::*;
 use super::*;
 
 use rustc_hash::FxHashMap as HashMap;
+use rustc_hash::FxHashSet as HashSet;
 use std::rc::Rc;
 
 #[derive(Clone, PartialEq, Eq, Hash)]
@@ -75,8 +76,12 @@ impl Type {
 	pub fn vars(&self) -> HashSet<Identifier> {
 		use Type::*;
 		match self {
-			Int => HashSet::new(),
-			Var(v) => HashSet::from([*v]),
+			Int => HashSet::default(),
+			Var(v) => {
+				let mut set = HashSet::default();
+				set.insert(*v);
+				set
+			}
 			Fun(l, r) => {
 				let mut vars = l.vars();
 				for v in r.vars() {

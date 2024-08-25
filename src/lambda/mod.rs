@@ -1,15 +1,14 @@
 pub mod context;
 pub mod env;
 pub mod parser;
-pub mod types;
 pub mod vars;
 
+pub use super::*;
 pub use context::*;
 pub use env::*;
-pub use types::*;
 pub use vars::*;
 
-use std::collections::HashSet;
+use rustc_hash::FxHashSet as HashSet;
 
 #[derive(Clone, Debug)]
 pub enum Term {
@@ -147,14 +146,18 @@ impl Term {
 	pub fn free_vars(&self) -> HashSet<Identifier> {
 		use Term::*;
 		match self {
-			Var(x) => HashSet::from([*x]),
+			Var(x) => {
+				let mut set = HashSet::default();
+				set.insert(*x);
+				set
+			}
 			Lam(x, b) => {
 				let mut free = b.free_vars();
 				free.remove(x);
 				free
 			}
 			App(t) => {
-				let mut free = HashSet::new();
+				let mut free = HashSet::default();
 				for f in t {
 					for v in f.free_vars() {
 						free.insert(v);
@@ -162,7 +165,7 @@ impl Term {
 				}
 				free
 			}
-			_ => HashSet::new(),
+			_ => HashSet::default(),
 		}
 	}
 

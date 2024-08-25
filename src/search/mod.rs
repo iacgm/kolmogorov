@@ -9,6 +9,7 @@ use cache::*;
 use node::*;
 
 use super::*;
+
 use std::rc::Rc;
 
 pub fn search(ctxt: Context, targ: &Type, size: usize) -> Enumerator {
