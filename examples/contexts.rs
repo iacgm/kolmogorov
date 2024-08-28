@@ -31,6 +31,15 @@ pub fn polynomials() -> Context {
 pub fn fib_ctx() -> Context {
 	use Term::*;
 
+	let lte = builtin!(
+		N => N => N => N => N
+		|a, b| => if a.int()? <= b.int()? {
+			term!(a b -> a)
+		} else {
+			term!(a b -> b)
+		}
+	);
+
 	let plus = builtin!(
 		N => N => N
 		|x, y| => Num(x.int()?+y.int()?)
@@ -51,7 +60,7 @@ pub fn fib_ctx() -> Context {
 		| | => Num(2)
 	);
 	
-	context! { plus, minus, one, two }
+	context! { lte, plus, minus, one, two }
 }
 
 #[allow(dead_code)]
