@@ -7,7 +7,7 @@ fn main() {
 	let ctxt = polynomials();
 
 	let program = term!{
-		plus(one)(1)
+		(k -> k)(1)
 	};
 
 	println!("{}", ctxt.evaluate(program));

@@ -39,13 +39,13 @@ impl Context {
 		match term {
 			Num(_) | Lam(_, _) => (),
 			Var(v) => {
-				if let Some(builtin) = self.get(v) {
-					if builtin.n_args == 0 {
-						let func = &*builtin.func;
-						*term = func(&mut []).unwrap().into();
-						drop(borrow);
-						self.evaluate_thunk(thunk)
-					}
+				if let Some(BuiltIn {
+					func, n_args: 0, ..
+				}) = self.get(v)
+				{
+					*term = func(&mut []).unwrap().into();
+					drop(borrow);
+					self.evaluate_thunk(thunk)
 				}
 			}
 			Ref(next) => {
@@ -64,41 +64,23 @@ impl Context {
 		use NTerm::*;
 		use SpineCollapse::*;
 		match root {
-			Num(_) | Lam(_, _) => Whnf,
 			Ref(thunk) => self.collapse_spine(&mut thunk.borrow_mut(), depth),
-			Var(v) => {
-				if let Some(builtin) = self.get(v) {
-					if builtin.n_args == 0 {
-						let func = &*builtin.func;
-						*root = func(&mut []).unwrap().into();
-						self.collapse_spine(root, depth)
-					} else if depth >= builtin.n_args {
-						Exec(builtin.clone(), vec![])
-					} else {
-						Whnf
-					}
-				} else {
-					Whnf
-				}
-			}
-			App(l, r) => {
-				let borr = (**l).borrow();
-				if let Lam(_, _) = *borr {
-					let Lam(v, b) = borr.clone() else {
-						unreachable!()
-					};
-
-					drop(borr);
-
-					*root = instantiate(&b, v, r);
-
+			Num(_) | Lam(_, _) => Whnf,
+			Var(v) => match self.get(v) {
+				Some(BuiltIn {
+					func, n_args: 0, ..
+				}) => {
+					*root = func(&mut []).unwrap().into();
 					self.collapse_spine(root, depth)
-				} else {
-					drop(borr);
-
-					let mut spine = self.collapse_spine(&mut l.borrow_mut(), depth + 1);
-
-					if let Exec(builtin, args) = &mut spine {
+				}
+				Some(blt) if blt.n_args <= depth => Exec(blt.clone(), vec![]),
+				_ => Whnf,
+			},
+			App(l, r) => {
+				let mut borr = l.borrow_mut();
+				match self.collapse_spine(&mut borr, depth + 1) {
+					Exec(builtin, mut args) => {
+						drop(borr);
 						let argc = builtin.n_args;
 
 						args.push(r.clone());
@@ -118,12 +100,28 @@ impl Context {
 
 							if let Some(term) = func(&mut terms[..]) {
 								*root = term.into();
+								return self.collapse_spine(root, depth);
 							}
 						}
 
-						spine
-					} else {
-						self.collapse_spine(root, depth)
+						Exec(builtin, args)
+					}
+					Whnf => {
+						drop(borr);
+						let borr = (**l).borrow();
+						if let Lam(_, _) = *borr {
+							let Lam(v, b) = borr.clone() else {
+								unreachable!()
+							};
+
+							drop(borr);
+
+							*root = instantiate(&b, v, r);
+							self.collapse_spine(root, depth)
+						} else {
+							drop(borr);
+							self.collapse_spine(root, depth)
+						}
 					}
 				}
 			}

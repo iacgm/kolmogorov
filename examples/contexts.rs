@@ -33,10 +33,10 @@ pub fn fib_ctx() -> Context {
 
 	let lte = builtin!(
 		N => N => N => N => N
-		|a, b, t, f| => if a.int()? <= b.int()? {
-			t.clone()
+		|a, b| => if a.int()? <= b.int()? {
+			term!(a b -> a)
 		} else {
-			f.clone()
+			term!(a b -> b)
 		}
 	);
 

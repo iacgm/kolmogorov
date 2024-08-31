@@ -51,6 +51,7 @@ fn main() {
 					[term] prevs [Num(n)]
 				};
 
+				
 				let output: Term = ctxt.evaluate(program).into();
 
 				let Term::Num(output) = output else {
