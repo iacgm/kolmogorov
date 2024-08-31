@@ -12,11 +12,14 @@ pub enum SearchResult {
 
 type Search = (Rc<Type>, usize);
 type PathDict = HashMap<Search, SearchResult>;
+type ConstDict = HashMap<i32, usize>;
 
 pub struct Cache {
 	searches: Vec<Search>,
 	paths: Vec<PathDict>,
-	//Top element indicates whether pathdict should be popped. 
+	// Minimal sizes of representations of constants
+	consts: Vec<ConstDict>,
+	// Top element indicates whether pathdict should be popped.
 	pops: Vec<bool>,
 }
 
@@ -26,6 +29,7 @@ impl Cache {
 		Self {
 			searches: vec![],
 			paths: vec![Default::default()],
+			consts: vec![Default::default()],
 			pops: vec![],
 		}
 	}
@@ -33,6 +37,7 @@ impl Cache {
 	pub fn intro_var(&mut self, is_new: bool) {
 		if is_new {
 			self.paths.push(Default::default());
+			self.consts.push(Default::default());
 		}
 		self.pops.push(is_new);
 	}
@@ -40,6 +45,7 @@ impl Cache {
 	pub fn elim_var(&mut self) {
 		if self.pops.pop().unwrap() {
 			self.paths.pop();
+			self.consts.pop();
 		}
 	}
 
@@ -101,13 +107,37 @@ impl Cache {
 		self.active_mut().entry(search).or_insert(Unknown);
 	}
 
-	pub fn yield_term(&mut self, targ: &Rc<Type>, size: usize) {
+	pub fn yield_term(
+		&mut self,
+		targ: &Rc<Type>,
+		size: usize,
+		ctxt: &Context,
+		term: Term,
+	) -> Option<Term> {
+		if **targ == Type::Int {
+			if let NTerm::Num(n) = ctxt.evaluate(term.clone()) {
+				let cached = self
+					.consts
+					.last_mut()
+					.unwrap()
+					.entry(n)
+					.and_modify(|s| *s = (*s).min(size))
+					.or_insert(size);
+
+				if *cached < size {
+					return None;
+				}
+			}
+		}
+
 		let search = (targ.clone(), size);
 
 		self.active_mut()
 			.entry(search)
 			.and_modify(|r| *r = Inhabited)
 			.or_insert(Inhabited);
+
+		Some(term)
 	}
 
 	pub fn end_search(&mut self) {

@@ -122,7 +122,7 @@ impl Context {
 							self.collapse_spine(root, depth)
 						} else {
 							drop(borr);
-							self.collapse_spine(root, depth)
+							Whnf
 						}
 					}
 				}

@@ -12,7 +12,7 @@ pub use nterm::*;
 
 use rustc_hash::FxHashSet as HashSet;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Term {
 	Num(i32),
 	Var(Identifier),

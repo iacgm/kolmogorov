@@ -11,7 +11,13 @@ pub fn polynomials() -> Context {
 
 	let mult = builtin!(
 		N => N => N
-		|x, y| => Num(x.int()?*y.int()?)
+		|x, y| => {
+			if *x == Term::Num(0) || *y == Term::Num(0) {
+				Num(0)
+			} else {
+				Num(x.int()?*y.int()?)
+			}
+		}
 	);
 
 	let zero = builtin!(
@@ -59,7 +65,7 @@ pub fn fib_ctx() -> Context {
 		N
 		| | => Num(2)
 	);
-	
+
 	context! { lte, plus, minus, one, two }
 }
 

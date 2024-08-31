@@ -66,8 +66,16 @@ impl Node {
 					if let Some(curr_state) = state {
 						match curr_state.next(search_ctxt) {
 							Some(term) => {
-								search_ctxt.cache.yield_term(targ, size);
-								return Some(term);
+								if let Some(term) = search_ctxt.cache.yield_term(
+									targ,
+									size,
+									&search_ctxt.ctxt,
+									term,
+								) {
+									return Some(term);
+								} else {
+									continue;
+								}
 							}
 							None => *state = None,
 						};
