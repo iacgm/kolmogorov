@@ -1,12 +1,15 @@
 use kolmogorov::*;
 
+mod contexts;
+use contexts::*;
+
 fn main() {
-	let ctxt = context! {};
+	let ctxt = polynomials();
 
 	let program = term!{
-		(a b -> a) ((x -> x) o) ((y -> y) t)
+		plus(one)(1)
 	};
 
-	dbg!(ctxt.evaluate(program));
+	println!("{}", ctxt.evaluate(program));
 
 }

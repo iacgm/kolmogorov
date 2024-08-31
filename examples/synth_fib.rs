@@ -24,7 +24,10 @@ fn main() {
 	let start = Instant::now();
 
 	for size in 1.. {
-		println!("Time: {}", Instant::now().duration_since(start).as_secs_f32());
+		println!(
+			"Time: {}",
+			Instant::now().duration_since(start).as_secs_f32()
+		);
 		println!("Searching size {}:", size);
 		'search: for term in search(ctxt.clone(), &targ, size) {
 			for n in 1..8 {
@@ -44,15 +47,13 @@ fn main() {
 
 				ctxt.insert(&[("prevs", prevs)]);
 
-				let mut env = Environment::new(ctxt);
-
-				let mut program = term! {
+				let program = term! {
 					[term] prevs [Num(n)]
 				};
 
-				env.execute(&mut program);
+				let output: Term = ctxt.evaluate(program).into();
 
-				let Term::Num(output) = program else {
+				let Term::Num(output) = output else {
 					unreachable!()
 				};
 
