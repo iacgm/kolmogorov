@@ -73,7 +73,9 @@ impl Context {
 					*root = func(&mut []).unwrap().into();
 					self.collapse_spine(root, depth)
 				}
-				Some(blt) if blt.n_args <= depth => Exec(blt.clone(), vec![]),
+				Some(blt) if blt.n_args <= depth => {
+					Exec(blt.clone(), Vec::with_capacity(blt.n_args))
+				}
 				_ => Whnf,
 			},
 			App(l, r) => {
@@ -90,7 +92,7 @@ impl Context {
 								self.evaluate_thunk(arg);
 							}
 
-							let mut terms: Vec<Term> = vec![];
+							let mut terms: Vec<Term> = Vec::with_capacity(builtin.n_args);
 							for arg in args.drain(..).rev() {
 								let arg = Rc::unwrap_or_clone(arg).into_inner();
 								terms.push(arg.into());
@@ -116,7 +118,7 @@ impl Context {
 
 							drop(borr);
 
-							*root = instantiate(&b, v, r);
+							*root = b.instantiate(v, r);
 							self.collapse_spine(root, depth)
 						} else {
 							drop(borr);
@@ -129,32 +131,34 @@ impl Context {
 	}
 }
 
-fn instantiate(body: &NTerm, var: Identifier, thunk: &Thunk) -> NTerm {
-	use NTerm::*;
-	match &body {
-		Num(n) => Num(*n),
-		Lam(v, b) => {
-			if *v == var {
-				Lam(v, b.clone())
-			} else {
-				Lam(v, instantiate(b, var, thunk).into())
+impl NTerm {
+	fn instantiate(&self, var: Identifier, thunk: &Thunk) -> NTerm {
+		use NTerm::*;
+		match self {
+			Num(n) => Num(*n),
+			Lam(v, b) => {
+				if *v == var {
+					Lam(v, b.clone())
+				} else {
+					Lam(v, b.instantiate(var, thunk).into())
+				}
 			}
-		}
-		Var(v) => {
-			if *v == var {
-				Ref(thunk.clone())
-			} else {
-				Var(v)
+			Var(v) => {
+				if *v == var {
+					Ref(thunk.clone())
+				} else {
+					Var(v)
+				}
 			}
+			Ref(next) => {
+				let next = &*(**next).borrow();
+				next.instantiate(var, thunk)
+			}
+			App(l, r) => App(
+				(**l).borrow().instantiate(var, thunk).into(),
+				(**r).borrow().instantiate(var, thunk).into(),
+			),
 		}
-		Ref(next) => {
-			let next = &*(**next).borrow();
-			instantiate(next, var, thunk)
-		}
-		App(l, r) => App(
-			instantiate(&l.borrow_mut(), var, thunk).into(),
-			instantiate(&r.borrow_mut(), var, thunk).into(),
-		),
 	}
 }
 
