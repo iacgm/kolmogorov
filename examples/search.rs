@@ -4,8 +4,8 @@ mod contexts;
 use contexts::*;
 
 fn main() {
-	let ctx = polynomials();
-	let ty = ty!(N => N);
+	let ctx = fib_ctx();
+	let ty = ty!((N => N) => N => N);
 
 	for n in 2.. {
 		let start = std::time::Instant::now();

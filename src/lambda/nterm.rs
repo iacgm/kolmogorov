@@ -32,7 +32,7 @@ impl Context {
 	}
 
 	// True if any work done
-	fn evaluate_thunk(&self, thunk: &mut Thunk) {
+	pub fn evaluate_thunk(&self, thunk: &mut Thunk) {
 		use NTerm::*;
 		let mut borrow = (**thunk).borrow_mut();
 		let term = &mut *borrow;
