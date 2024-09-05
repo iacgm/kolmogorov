@@ -41,7 +41,7 @@ impl Context {
 					func, n_args: 0, ..
 				}) = self.get(v)
 				{
-					*term = func(&mut []).unwrap().into();
+					*term = func(&mut []).unwrap();
 					drop(borrow);
 					self.evaluate_thunk(thunk)
 				}
@@ -68,7 +68,7 @@ impl Context {
 				Some(BuiltIn {
 					func, n_args: 0, ..
 				}) => {
-					*root = func(&mut []).unwrap().into();
+					*root = func(&mut []).unwrap();
 					self.collapse_spine(root, depth)
 				}
 				Some(blt) if blt.n_args <= depth => {
@@ -90,12 +90,10 @@ impl Context {
 								self.evaluate_thunk(arg);
 							}
 
-							let mut terms: Vec<Thunk> = args.drain(..).collect();
-
 							let func = &*builtin.func;
 
-							if let Some(term) = func(&mut terms[..]) {
-								*root = term.into();
+							if let Some(term) = func(&mut args[..]) {
+								*root = term;
 								return self.collapse_spine(root, depth);
 							}
 						}

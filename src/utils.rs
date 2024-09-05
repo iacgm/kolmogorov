@@ -38,21 +38,6 @@ impl<T> Stack<T> {
 			Cons(_, _) => false,
 		}
 	}
-
-	pub fn to_vec(&self) -> Vec<T>
-	where
-		T: Clone,
-	{
-		use Node::*;
-		match &*self.0 {
-			Nil => vec![],
-			Cons(t, h) => {
-				let mut v = t.to_vec();
-				v.push(h.clone());
-				v
-			}
-		}
-	}
 }
 
 impl<T> From<Node<T>> for Stack<T> {
