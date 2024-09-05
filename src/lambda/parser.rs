@@ -1,19 +1,19 @@
 #[macro_export]
 macro_rules! term {
 	($x: ident) => {
-		$crate::NTerm::Var(stringify!($x))
+		$crate::Term::Var(stringify!($x))
 	};
 	([$x: expr]) => {
 		$x.clone()
 	};
 	($x: literal) => {
-		$crate::NTerm::Num($x)
+		$crate::Term::Num($x)
 	};
 	($x:ident -> $($r:tt)+) => {
-		$crate::NTerm::Lam(stringify!($x), $crate::term!($($r)+).into())
+		$crate::Term::Lam(stringify!($x), $crate::term!($($r)+).into())
 	};
 	($x:ident $($xs:ident)+ -> $($r:tt)+) => {
-		$crate::NTerm::Lam(stringify!($x), $crate::term!($($xs)* -> $($r)+).into())
+		$crate::Term::Lam(stringify!($x), $crate::term!($($xs)* -> $($r)+).into())
 	};
 	(($($r:tt)+)) => {
 		$crate::term!($($r)+)
@@ -22,7 +22,7 @@ macro_rules! term {
 		let mut start = $crate::term!($h);
 
 		$(
-			start = $crate::NTerm::App(
+			start = $crate::Term::App(
 				start.into(),
 				$crate::term!($args).into()
 			);

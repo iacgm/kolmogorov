@@ -1,7 +1,7 @@
 use kolmogorov::*;
 
 pub fn ctxt() -> Context {
-	use NTerm::*;
+	use Term::*;
 
 	let lte = builtin!(
 		N => N => N => N => N

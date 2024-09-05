@@ -2,13 +2,13 @@ use super::*;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-pub type Thunk = Rc<RefCell<NTerm>>;
+pub type Thunk = Rc<RefCell<Term>>;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum NTerm {
+pub enum Term {
 	Num(i32),
 	Var(Identifier),
-	Lam(Identifier, Rc<NTerm>),
+	Lam(Identifier, Rc<Term>),
 	App(Thunk, Thunk),
 
 	// Transparent indirection to another term.
@@ -23,7 +23,7 @@ enum SpineCollapse {
 }
 
 impl Context {
-	pub fn evaluate(&self, term: &NTerm) -> NTerm {
+	pub fn evaluate(&self, term: &Term) -> Term {
 		let mut thunk: Thunk = term.clone().into();
 		self.evaluate_thunk(&mut thunk);
 		Rc::unwrap_or_clone(thunk).into_inner()
@@ -31,7 +31,7 @@ impl Context {
 
 	// True if any work done
 	pub fn evaluate_thunk(&self, thunk: &mut Thunk) {
-		use NTerm::*;
+		use Term::*;
 		let mut borrow = (**thunk).borrow_mut();
 		let term = &mut *borrow;
 		match term {
@@ -58,8 +58,8 @@ impl Context {
 		}
 	}
 
-	fn collapse_spine(&self, root: &mut NTerm, depth: usize) -> SpineCollapse {
-		use NTerm::*;
+	fn collapse_spine(&self, root: &mut Term, depth: usize) -> SpineCollapse {
+		use Term::*;
 		use SpineCollapse::*;
 		match root {
 			Ref(thunk) => self.collapse_spine(&mut thunk.borrow_mut(), depth),
@@ -123,9 +123,9 @@ impl Context {
 	}
 }
 
-impl NTerm {
-	fn instantiate(&self, var: Identifier, thunk: &Thunk) -> NTerm {
-		use NTerm::*;
+impl Term {
+	fn instantiate(&self, var: Identifier, thunk: &Thunk) -> Term {
+		use Term::*;
 		match self {
 			Num(n) => Num(*n),
 			Lam(v, b) => {
@@ -154,7 +154,7 @@ impl NTerm {
 	}
 
 	pub fn size(&self) -> usize {
-		use NTerm::*;
+		use Term::*;
 		match self {
 			Ref(r) => (**r).borrow().size(),
 			Num(_) | Var(_) => 1,
@@ -164,7 +164,7 @@ impl NTerm {
 	}
 
 	pub fn int(&self) -> Option<i32> {
-		use NTerm::*;
+		use Term::*;
 		match self {
 			Ref(r) => (**r).borrow().int(),
 			Num(n) => Some(*n),
@@ -173,15 +173,15 @@ impl NTerm {
 	}
 }
 
-impl From<NTerm> for Thunk {
-	fn from(value: NTerm) -> Self {
+impl From<Term> for Thunk {
+	fn from(value: Term) -> Self {
 		Rc::new(value.into())
 	}
 }
 
-impl std::fmt::Display for NTerm {
+impl std::fmt::Display for Term {
 	fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		use NTerm::*;
+		use Term::*;
 		match self {
 			Ref(r) => write!(fmt, "{}", (**r).borrow()),
 			Num(k) => write!(fmt, "{}", k),

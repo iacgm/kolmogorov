@@ -14,7 +14,7 @@ fn fib(n: i32) -> i32 {
 fn main() {
 	use std::rc::Rc;
 	use std::time::Instant;
-	use NTerm::*;
+	use Term::*;
 
 	let targ = ty!((N => N) => N => N);
 

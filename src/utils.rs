@@ -46,15 +46,15 @@ impl<T> From<Node<T>> for Stack<T> {
 	}
 }
 
-use super::lambda::NTerm;
-impl Stack<NTerm> {
+use super::lambda::Term;
+impl Stack<Term> {
 	//returns the stack as a reversed vector
-	pub fn build_term(self) -> NTerm {
+	pub fn build_term(self) -> Term {
 		use Node::*;
 		match Rc::unwrap_or_clone(self.0) {
 			Nil => unimplemented!(),
 			Cons(t, h) if t.is_nil() => h,
-			Cons(t, h) => NTerm::App(t.build_term().into(), h.into()),
+			Cons(t, h) => Term::App(t.build_term().into(), h.into()),
 		}
 	}
 }

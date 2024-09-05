@@ -10,7 +10,7 @@ fn pow(n: i32) -> i32 {
 }
 
 fn main() {
-	use NTerm::*;
+	use Term::*;
 	let ctxt = polynomials();
 	let targ = ty!(N => N => N);
 

@@ -1,7 +1,7 @@
 use kolmogorov::*;
 
 fn main() {
-	use NTerm::*;
+	use Term::*;
 
 	let nil = term!(c n -> n);
 	let cons = term!(h t c n -> c h (t c n));
