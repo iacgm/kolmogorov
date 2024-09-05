@@ -1,11 +1,10 @@
 use super::*;
-use std::borrow::Borrow;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-type Thunk = Rc<RefCell<NTerm>>;
+pub type Thunk = Rc<RefCell<NTerm>>;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum NTerm {
 	Num(i32),
 	Var(Identifier),
@@ -24,9 +23,8 @@ enum SpineCollapse {
 }
 
 impl Context {
-	pub fn evaluate(&self, term: Term) -> NTerm {
-		let term = NTerm::from(term);
-		let mut thunk: Thunk = term.into();
+	pub fn evaluate(&self, term: &NTerm) -> NTerm {
+		let mut thunk: Thunk = term.clone().into();
 		self.evaluate_thunk(&mut thunk);
 		Rc::unwrap_or_clone(thunk).into_inner()
 	}
@@ -92,11 +90,7 @@ impl Context {
 								self.evaluate_thunk(arg);
 							}
 
-							let mut terms: Vec<Term> = Vec::with_capacity(builtin.n_args);
-							for arg in args.drain(..).rev() {
-								let arg = Rc::unwrap_or_clone(arg).into_inner();
-								terms.push(arg.into());
-							}
+							let mut terms: Vec<Thunk> = args.drain(..).collect();
 
 							let func = &*builtin.func;
 
@@ -160,6 +154,25 @@ impl NTerm {
 			),
 		}
 	}
+
+	pub fn size(&self) -> usize {
+		use NTerm::*;
+		match self {
+			Ref(r) => (**r).borrow().size(),
+			Num(_) | Var(_) => 1,
+			Lam(_, b) => 1 + b.size(),
+			App(l, r) => 1 + l.borrow().size() + r.borrow().size(),
+		}
+	}
+
+	pub fn int(&self) -> Option<i32> {
+		use NTerm::*;
+		match self {
+			Ref(r) => (**r).borrow().int(),
+			Num(n) => Some(*n),
+			_ => None,
+		}
+	}
 }
 
 impl From<NTerm> for Thunk {
@@ -168,44 +181,26 @@ impl From<NTerm> for Thunk {
 	}
 }
 
-impl From<Term> for NTerm {
-	fn from(value: Term) -> Self {
-		use NTerm::*;
-		match value {
-			Term::Num(n) => Num(n),
-			Term::Var(v) => Var(v),
-			Term::Lam(v, b) => Lam(v, Rc::new(Self::from(*b))),
-			Term::App(mut apps) => {
-				let mut res: NTerm = apps.pop().unwrap().into();
-				while !apps.is_empty() {
-					let arg: NTerm = apps.pop().unwrap().into();
-					res = App(res.into(), arg.into());
-				}
-				res
-			}
-		}
-	}
-}
-
-impl From<NTerm> for Term {
-	fn from(value: NTerm) -> Self {
-		use Term::*;
-		match value {
-			NTerm::Num(n) => Num(n),
-			NTerm::Var(v) => Var(v),
-			NTerm::Lam(v, b) => Lam(v, Box::new(Self::from((*b).borrow().clone()))),
-			NTerm::Ref(next) => (*next).borrow().clone().into(),
-			NTerm::App(l, r) => {
-				let l = Self::from((*l).borrow().clone());
-				let r = Self::from((*r).borrow().clone());
-				l.applied_to(r)
-			}
-		}
-	}
-}
-
 impl std::fmt::Display for NTerm {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		Term::from(self.clone()).fmt(f)
+	fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		use NTerm::*;
+		match self {
+			Ref(r) => write!(fmt, "{}", (**r).borrow()),
+			Num(k) => write!(fmt, "{}", k),
+			Var(v) => write!(fmt, "{}", v),
+			Lam(v, b) => {
+				write!(fmt, "(\\{}", v)?;
+				let mut r = &**b;
+				while let Lam(v, next) = r {
+					write!(fmt, " {}", v)?;
+					r = &**next;
+				}
+				write!(fmt, " -> {}", r)?;
+				write!(fmt, ")")
+			}
+			App(l, r) => {
+				write!(fmt, "{}({})", (**l).borrow(), (**r).borrow())
+			}
+		}
 	}
 }

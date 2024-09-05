@@ -1,7 +1,7 @@
 use kolmogorov::*;
 
 fn main() {
-	use Term::*;
+	use NTerm::*;
 
 	let nil = term!(c n -> n);
 	let cons = term!(h t c n -> c h (t c n));
@@ -11,13 +11,13 @@ fn main() {
 		|x, y| => Num(x.int()?+y.int()?)
 	);
 
-	let mut dictionary = dict! {plus};
+	let ctxt = context! { plus };
 
 	let list = term!([cons] 1 [nil]);
 
-	let mut sum = term!([list] plus 0);
+	let sum = term!([list] plus 0);
 
-	dictionary.execute(&mut sum);
+	let output = ctxt.evaluate(&sum);
 
-	println!("sum = {}", sum);
+	println!("sum = {}", output);
 }

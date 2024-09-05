@@ -25,7 +25,7 @@ pub(super) enum Node {
 	Arg {
 		targ: Rc<Type>,
 		size: usize,
-		apps: Stack<Term>,
+		apps: Stack<NTerm>,
 		app_state: Option<Box<Node>>,
 		app_ty: Rc<Type>,
 		arg_state: Option<Box<Node>>,
@@ -46,7 +46,7 @@ impl AllPhase {
 }
 
 impl Node {
-	pub fn next(&mut self, search_ctxt: &mut SearchContext) -> Option<Term> {
+	pub fn next(&mut self, search_ctxt: &mut SearchContext) -> Option<NTerm> {
 		use Node::*;
 		loop {
 			//dbg!(&self);
@@ -129,7 +129,7 @@ impl Node {
 
 					if let Some(curr_state) = state {
 						return match curr_state.next(search_ctxt) {
-							Some(term) => Some(Term::Lam(ident, term.into())),
+							Some(term) => Some(NTerm::Lam(ident, term.into())),
 							None => {
 								search_ctxt.args.pop().unwrap();
 								search_ctxt.vgen.freshen(ident);
@@ -170,7 +170,7 @@ impl Node {
 
 					if size == 1 {
 						if v_ty == *targ {
-							return Some(Term::Var(var));
+							return Some(NTerm::Var(var));
 						} else {
 							continue;
 						}
@@ -179,7 +179,7 @@ impl Node {
 					*state = Some(Box::new(Arg {
 						targ: targ.clone(),
 						size: size - 1,
-						apps: Stack::one(Term::Var(var)),
+						apps: Stack::one(NTerm::Var(var)),
 						app_ty: v_ty,
 						app_state: None,
 						arg_state: None,

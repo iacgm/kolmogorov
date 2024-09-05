@@ -14,7 +14,7 @@ fn fib(n: i32) -> i32 {
 fn main() {
 	use std::rc::Rc;
 	use std::time::Instant;
-	use Term::*;
+	use NTerm::*;
 
 	let targ = ty!((N => N) => N => N);
 
@@ -47,8 +47,6 @@ fn main() {
 
 	exec_ctxt.insert(&prevs[..]);
 
-	let mut env = Environment::new(exec_ctxt);
-
 	let mut total_time = 0.;
 	let mut search_time = 0.;
 	let start = Instant::now();
@@ -64,25 +62,21 @@ fn main() {
 			let search_end = Instant::now();
 
 			search_time += search_end.duration_since(search_start).as_secs_f32();
-			
+
 			for n in 1..limit {
 				let rec_arg = prevs[n as usize - 1].0;
 
-				let mut program = term! {
+				let program = term! {
 					[term] [Var(rec_arg)] [Num(n)]
 				};
 
 				let start_exec = Instant::now();
-				env.execute(&mut program);
+				let output = exec_ctxt.evaluate(&program);
 				let end_exec = Instant::now();
-
-				let output = program;
 
 				total_time += end_exec.duration_since(start_exec).as_secs_f32();
 
-				let Term::Num(output) = output else {
-					unreachable!()
-				};
+				let output = output.int().unwrap();
 
 				let expected = fib(n);
 				if output != expected {

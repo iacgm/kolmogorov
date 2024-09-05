@@ -2,7 +2,7 @@ use kolmogorov::*;
 
 #[allow(dead_code)]
 pub fn polynomials() -> Context {
-	use Term::*;
+	use NTerm::*;
 
 	let plus = builtin!(
 		N => N => N
@@ -12,7 +12,7 @@ pub fn polynomials() -> Context {
 	let mult = builtin!(
 		N => N => N
 		|x, y| => {
-			if *x == Term::Num(0) || *y == Term::Num(0) {
+			if *x == NTerm::Num(0) || *y == NTerm::Num(0) {
 				Num(0)
 			} else {
 				Num(x.int()?*y.int()?)
@@ -35,7 +35,7 @@ pub fn polynomials() -> Context {
 
 #[allow(dead_code)]
 pub fn fib_ctx() -> Context {
-	use Term::*;
+	use NTerm::*;
 
 	let lte = builtin!(
 		N => N => N => N => N
@@ -70,4 +70,6 @@ pub fn fib_ctx() -> Context {
 }
 
 #[allow(dead_code)]
-fn main() {}
+fn main() {
+	panic!("This file is not intended to be executed directly.")
+}

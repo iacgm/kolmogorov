@@ -86,7 +86,7 @@ impl SearchContext {
 }
 
 impl Iterator for Enumerator {
-	type Item = Term;
+	type Item = NTerm;
 
 	fn next(&mut self) -> Option<Self::Item> {
 		self.root.next(&mut self.search_ctxt)

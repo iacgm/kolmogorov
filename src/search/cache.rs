@@ -112,10 +112,10 @@ impl Cache {
 		targ: &Rc<Type>,
 		size: usize,
 		ctxt: &Context,
-		term: Term,
-	) -> Option<Term> {
+		term: NTerm,
+	) -> Option<NTerm> {
 		if **targ == Type::Int {
-			if let NTerm::Num(n) = ctxt.evaluate(term.clone()) {
+			if let NTerm::Num(n) = ctxt.evaluate(&term) {
 				let cached = self
 					.consts
 					.last_mut()

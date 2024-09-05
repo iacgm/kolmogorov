@@ -6,10 +6,9 @@ use contexts::*;
 fn main() {
 	let ctxt = polynomials();
 
-	let program = term!{
+	let program = term! {
 		plus(one)(1)
 	};
 
-	println!("{}", ctxt.evaluate(program));
-
+	println!("{}", ctxt.evaluate(&program));
 }

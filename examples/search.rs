@@ -1,10 +1,42 @@
 use kolmogorov::*;
 
-mod contexts;
-use contexts::*;
+pub fn ctxt() -> Context {
+	use NTerm::*;
+
+	let lte = builtin!(
+		N => N => N => N => N
+		|a, b| => if a.int()? <= b.int()? {
+			term!(a b -> a)
+		} else {
+			term!(a b -> b)
+		}
+	);
+
+	let plus = builtin!(
+		N => N => N
+		|x, y| => Num(x.int()?+y.int()?)
+	);
+
+	let minus = builtin!(
+		N => N => N
+		|x, y| => Num(x.int()?-y.int()?)
+	);
+
+	let one = builtin!(
+		N
+		| | => Num(1)
+	);
+
+	let two = builtin!(
+		N
+		| | => Num(2)
+	);
+
+	context! { lte, plus, minus, one, two }
+}
 
 fn main() {
-	let ctx = fib_ctx();
+	let ctx = ctxt();
 	let ty = ty!((N => N) => N => N);
 
 	for n in 2.. {
