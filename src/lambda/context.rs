@@ -65,4 +65,108 @@ impl Context {
 				}
 			})
 	}
+
+	pub fn evaluate(&self, term: &Term) -> Term {
+		let mut thunk: Thunk = term.clone().into();
+		self.evaluate_thunk(&mut thunk);
+		Rc::unwrap_or_clone(thunk).into_inner()
+	}
+
+	// True if any work done
+	pub fn evaluate_thunk(&self, thunk: &mut Thunk) {
+		use Term::*;
+		let mut borrow = (**thunk).borrow_mut();
+		let term = &mut *borrow;
+		match term {
+			Num(_) | Lam(_, _) => (),
+			Var(v) => {
+				if let Some(BuiltIn {
+					func, n_args: 0, ..
+				}) = self.get(v)
+				{
+					*term = func(&mut []).unwrap();
+					drop(borrow);
+					self.evaluate_thunk(thunk)
+				}
+			}
+			Ref(next) => {
+				let next = next.clone();
+				drop(borrow);
+				*thunk = next;
+				self.evaluate_thunk(thunk)
+			}
+			App(_, _) => {
+				self.collapse_spine(term, 0);
+			}
+		}
+	}
+
+	fn collapse_spine(&self, root: &mut Term, depth: usize) -> SpineCollapse {
+		use SpineCollapse::*;
+		use Term::*;
+		match root {
+			Ref(thunk) => self.collapse_spine(&mut thunk.borrow_mut(), depth),
+			Num(_) | Lam(_, _) => Whnf,
+			Var(v) => match self.get(v) {
+				Some(BuiltIn {
+					func, n_args: 0, ..
+				}) => {
+					*root = func(&mut []).unwrap();
+					self.collapse_spine(root, depth)
+				}
+				Some(blt) if blt.n_args <= depth => {
+					Exec(blt.clone(), Vec::with_capacity(blt.n_args))
+				}
+				_ => Whnf,
+			},
+			App(l, r) => {
+				let mut borr = l.borrow_mut();
+				match self.collapse_spine(&mut borr, depth + 1) {
+					Exec(builtin, mut args) => {
+						drop(borr);
+						let argc = builtin.n_args;
+
+						args.push(r.clone());
+
+						if argc == args.len() {
+							for arg in &mut args[..] {
+								self.evaluate_thunk(arg);
+							}
+
+							let func = &*builtin.func;
+
+							if let Some(term) = func(&mut args[..]) {
+								*root = term;
+								return self.collapse_spine(root, depth);
+							}
+						}
+
+						Exec(builtin, args)
+					}
+					Whnf => {
+						drop(borr);
+						let borr = (**l).borrow();
+						if let Lam(_, _) = *borr {
+							let Lam(v, b) = borr.clone() else {
+								unreachable!()
+							};
+
+							drop(borr);
+
+							*root = b.instantiate_var(v, r);
+							self.collapse_spine(root, depth)
+						} else {
+							drop(borr);
+							Whnf
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+enum SpineCollapse {
+	Whnf,
+	Exec(BuiltIn, Vec<Thunk>),
 }

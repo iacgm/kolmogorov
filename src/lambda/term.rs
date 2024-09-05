@@ -4,127 +4,36 @@ use std::rc::Rc;
 
 pub type Thunk = Rc<RefCell<Term>>;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug)]
 pub enum Term {
 	Num(i32),
 	Var(Identifier),
 	Lam(Identifier, Rc<Term>),
 	App(Thunk, Thunk),
 
-	// Transparent indirection to another term.
+	// Ref:
+	// Transparent indirection to another term (May be deleted in the process of other operations)
 	// Occasionally useful for a faithful implementation of graph reduction.
 	// May eventually be removed during optimization.
 	Ref(Thunk),
 }
 
-enum SpineCollapse {
-	Whnf,
-	Exec(BuiltIn, Vec<Thunk>),
-}
-
-impl Context {
-	pub fn evaluate(&self, term: &Term) -> Term {
-		let mut thunk: Thunk = term.clone().into();
-		self.evaluate_thunk(&mut thunk);
-		Rc::unwrap_or_clone(thunk).into_inner()
-	}
-
-	// True if any work done
-	pub fn evaluate_thunk(&self, thunk: &mut Thunk) {
-		use Term::*;
-		let mut borrow = (**thunk).borrow_mut();
-		let term = &mut *borrow;
-		match term {
-			Num(_) | Lam(_, _) => (),
-			Var(v) => {
-				if let Some(BuiltIn {
-					func, n_args: 0, ..
-				}) = self.get(v)
-				{
-					*term = func(&mut []).unwrap();
-					drop(borrow);
-					self.evaluate_thunk(thunk)
-				}
-			}
-			Ref(next) => {
-				let next = next.clone();
-				drop(borrow);
-				*thunk = next;
-				self.evaluate_thunk(thunk)
-			}
-			App(_, _) => {
-				self.collapse_spine(term, 0);
-			}
-		}
-	}
-
-	fn collapse_spine(&self, root: &mut Term, depth: usize) -> SpineCollapse {
-		use Term::*;
-		use SpineCollapse::*;
-		match root {
-			Ref(thunk) => self.collapse_spine(&mut thunk.borrow_mut(), depth),
-			Num(_) | Lam(_, _) => Whnf,
-			Var(v) => match self.get(v) {
-				Some(BuiltIn {
-					func, n_args: 0, ..
-				}) => {
-					*root = func(&mut []).unwrap();
-					self.collapse_spine(root, depth)
-				}
-				Some(blt) if blt.n_args <= depth => {
-					Exec(blt.clone(), Vec::with_capacity(blt.n_args))
-				}
-				_ => Whnf,
-			},
-			App(l, r) => {
-				let mut borr = l.borrow_mut();
-				match self.collapse_spine(&mut borr, depth + 1) {
-					Exec(builtin, mut args) => {
-						drop(borr);
-						let argc = builtin.n_args;
-
-						args.push(r.clone());
-
-						if argc == args.len() {
-							for arg in &mut args[..] {
-								self.evaluate_thunk(arg);
-							}
-
-							let func = &*builtin.func;
-
-							if let Some(term) = func(&mut args[..]) {
-								*root = term;
-								return self.collapse_spine(root, depth);
-							}
-						}
-
-						Exec(builtin, args)
-					}
-					Whnf => {
-						drop(borr);
-						let borr = (**l).borrow();
-						if let Lam(_, _) = *borr {
-							let Lam(v, b) = borr.clone() else {
-								unreachable!()
-							};
-
-							drop(borr);
-
-							*root = b.instantiate(v, r);
-							self.collapse_spine(root, depth)
-						} else {
-							drop(borr);
-							Whnf
-						}
-					}
-				}
-			}
-		}
-	}
-}
-
 impl Term {
-	fn instantiate(&self, var: Identifier, thunk: &Thunk) -> Term {
+	pub fn deep_clone(&self) -> Self {
+		use Term::*;
+		match self {
+			Ref(r) => (**r).borrow().deep_clone(),
+			Num(n) => Num(*n),
+			Var(v) => Var(v),
+			Lam(v, b) => Lam(v, b.clone()),
+			App(l, r) => App(
+				(**l).borrow().deep_clone().into(),
+				(**r).borrow().deep_clone().into(),
+			),
+		}
+	}
+
+	pub fn instantiate_var(&self, var: Identifier, thunk: &Thunk) -> Term {
 		use Term::*;
 		match self {
 			Num(n) => Num(*n),
@@ -132,7 +41,7 @@ impl Term {
 				if *v == var {
 					Lam(v, b.clone())
 				} else {
-					Lam(v, b.instantiate(var, thunk).into())
+					Lam(v, b.instantiate_var(var, thunk).into())
 				}
 			}
 			Var(v) => {
@@ -144,11 +53,11 @@ impl Term {
 			}
 			Ref(next) => {
 				let next = &*(**next).borrow();
-				next.instantiate(var, thunk)
+				next.instantiate_var(var, thunk)
 			}
 			App(l, r) => App(
-				(**l).borrow().instantiate(var, thunk).into(),
-				(**r).borrow().instantiate(var, thunk).into(),
+				(**l).borrow().instantiate_var(var, thunk).into(),
+				(**r).borrow().instantiate_var(var, thunk).into(),
 			),
 		}
 	}
@@ -169,6 +78,20 @@ impl Term {
 			Ref(r) => (**r).borrow().int(),
 			Num(n) => Some(*n),
 			_ => None,
+		}
+	}
+}
+
+//Syntactic equality, not α-equality (might be useful to implement eventually)
+impl PartialEq for Term {
+	fn eq(&self, other: &Self) -> bool {
+		use Term::*;
+		match (self, other) {
+			(Ref(r), t) | (t, Ref(r)) => &*(**r).borrow() == t,
+			(Num(a), Num(b)) => a == b,
+			(Var(a), Var(b)) => a == b,
+			(Lam(va, ba), Lam(vb, bb)) => va == vb && ba == bb,
+			_ => false,
 		}
 	}
 }
