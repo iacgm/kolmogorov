@@ -214,7 +214,7 @@ impl Node {
 							unreachable!()
 						};
 
-						return Some(Term::Ref(left.clone()));
+						return Some(left.borrow().clone());
 					} else if size == 0 || targ == l_ty {
 						*self = Nil;
 						return None;
