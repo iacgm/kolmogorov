@@ -89,6 +89,8 @@ impl Iterator for Enumerator {
 	type Item = Term;
 
 	fn next(&mut self) -> Option<Self::Item> {
-		self.root.next(&mut self.search_ctxt)
+		self.root
+			.next(&mut self.search_ctxt)
+			.map(|t| Term::deep_clone(&t))
 	}
 }

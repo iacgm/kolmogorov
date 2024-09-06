@@ -25,9 +25,9 @@ pub(super) enum Node {
 	Arg {
 		targ: Rc<Type>,
 		size: usize,
-		apps: Stack<Term>,
-		app_state: Option<Box<Node>>,
-		app_ty: Rc<Type>,
+		l_ty: Rc<Type>,
+		left: Thunk,
+		state: Option<Box<Node>>,
 		arg_state: Option<Box<Node>>,
 		res: SearchResult,
 	},
@@ -179,9 +179,9 @@ impl Node {
 					*state = Some(Box::new(Arg {
 						targ: targ.clone(),
 						size: size - 1,
-						apps: Stack::one(Term::Var(var)),
-						app_ty: v_ty,
-						app_state: None,
+						l_ty: v_ty,
+						left: Term::Var(var).into(),
+						state: None,
 						arg_state: None,
 						res: Unknown,
 					}));
@@ -190,16 +190,16 @@ impl Node {
 				Arg {
 					targ,
 					size,
+					l_ty,
+					left,
+					state,
 					arg_state,
-					app_state,
-					apps,
-					app_ty,
 					res,
 				} => {
-					if let Some(curr_state) = app_state {
+					if let Some(curr_state) = state {
 						match curr_state.next(search_ctxt) {
 							Some(term) => return Some(term),
-							None => *app_state = None,
+							None => *state = None,
 						};
 					};
 
@@ -209,23 +209,23 @@ impl Node {
 						return None;
 					}
 
-					if size == 0 && targ == app_ty {
-						let Arg { apps, .. } = std::mem::replace(self, Nil) else {
+					if size == 0 && targ == l_ty {
+						let Arg { left, .. } = std::mem::replace(self, Nil) else {
 							unreachable!()
 						};
 
-						return Some(apps.build_term());
-					} else if size == 0 || targ == app_ty {
+						return Some(Term::Ref(left.clone()));
+					} else if size == 0 || targ == l_ty {
 						*self = Nil;
 						return None;
 					}
 
-					let Type::Fun(arg_ty, ret_ty) = &**app_ty else {
+					let Type::Fun(arg_ty, ret_ty) = &**l_ty else {
 						unreachable!()
 					};
 
 					if *res == Unknown {
-						*res = search_ctxt.cache.prune_arg(targ, app_ty, size);
+						*res = search_ctxt.cache.prune_arg(targ, l_ty, size);
 
 						if *res == Uninhabited {
 							self.early_exit(search_ctxt);
@@ -282,12 +282,12 @@ impl Node {
 						}
 					};
 
-					*app_state = Some(Box::new(Arg {
+					*state = Some(Box::new(Arg {
 						targ: targ.clone(),
 						size: size - arg_size - 1,
-						apps: apps.cons(arg),
-						app_state: None,
-						app_ty: ret_ty.clone(),
+						l_ty: ret_ty.clone(),
+						left: Term::App(left.clone(), arg.into()).into(),
+						state: None,
 						arg_state: None,
 						res: Unknown,
 					}))
@@ -312,11 +312,9 @@ impl Node {
 				}
 			}
 			Arg {
-				app_state,
-				arg_state,
-				..
+				state, arg_state, ..
 			} => {
-				if let Some(state) = app_state.take().as_mut() {
+				if let Some(state) = state.take().as_mut() {
 					state.early_exit(search_ctxt);
 				}
 				if let Some(state) = arg_state.take().as_mut() {
