@@ -6,15 +6,19 @@ use super::*;
 use rustc_hash::FxHashMap as HashMap;
 use std::rc::Rc;
 
+pub type Canonizer = Rc<dyn Fn(&mut Term) -> bool>;
+
 #[derive(Clone)]
 pub struct Context {
+	pub canonizer: Canonizer,
 	defs: HashMap<Identifier, BuiltIn>,
 }
 
 impl Context {
-	pub fn new(defs: &[(Identifier, BuiltIn)]) -> Self {
+	pub fn new(defs: &[(Identifier, BuiltIn)], canonizer: Canonizer) -> Self {
 		Self {
 			defs: HashMap::from_iter(defs.iter().cloned()),
+			canonizer,
 		}
 	}
 

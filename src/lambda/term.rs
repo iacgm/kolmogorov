@@ -4,7 +4,7 @@ use std::rc::Rc;
 
 pub type Thunk = Rc<RefCell<Term>>;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq)]
 pub enum Term {
 	Num(i32),
 	Var(Identifier),
@@ -62,6 +62,38 @@ impl Term {
 		}
 	}
 
+	// `self` is a pattern which generalizes term.
+	pub fn unify(&self, term: &Term) -> Option<Vec<Term>> {
+		fn unify_into(patt: &Term, term: &Term, out: &mut Vec<Term>) -> bool {
+			use Term::*;
+			match (patt, term) {
+				(Ref(r), _) => unify_into(&r.borrow(), term, out),
+				(_, Ref(r)) => unify_into(patt, &r.borrow(), out),
+				(Var("_"), term) => {
+					out.push(term.clone());
+					true
+				}
+				(Var(a), Var(b)) => a == b,
+				(Num(a), Num(b)) => a == b,
+				(App(pl, pr), App(tl, tr)) => {
+					let pl = &pl.borrow();
+					let tl = &tl.borrow();
+					let pr = &pr.borrow();
+					let tr = &tr.borrow();
+					unify_into(pl, tl, out) && unify_into(pr, tr, out)
+				}
+				_ => false,
+			}
+		}
+
+		let mut vec = vec![];
+		if unify_into(self, term, &mut vec) {
+			Some(vec)
+		} else {
+			None
+		}
+	}
+
 	pub fn size(&self) -> usize {
 		use Term::*;
 		match self {
@@ -75,7 +107,7 @@ impl Term {
 	pub fn int(&self) -> Option<i32> {
 		use Term::*;
 		match self {
-			Ref(r) => (**r).borrow().int(),
+			Ref(r) => r.borrow().int(),
 			Num(n) => Some(*n),
 			_ => None,
 		}
@@ -91,7 +123,39 @@ impl PartialEq for Term {
 			(Num(a), Num(b)) => a == b,
 			(Var(a), Var(b)) => a == b,
 			(Lam(va, ba), Lam(vb, bb)) => va == vb && ba == bb,
+			(App(ll, lr), App(rl, rr)) => {
+				let ll = &ll.borrow();
+				let lr = &lr.borrow();
+				let rl = &rl.borrow();
+				let rr = &rr.borrow();
+				**ll == **rl && **lr == **rr
+			}
 			_ => false,
+		}
+	}
+}
+
+impl std::hash::Hash for Term {
+	fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+		use Term::*;
+		if let Ref(r) = self {
+			return (**r).borrow().hash(state);
+		} else {
+			std::mem::discriminant(self).hash(state);
+		}
+
+		match self {
+			Ref(_) => unreachable!(),
+			Num(n) => n.hash(state),
+			Var(v) => v.hash(state),
+			Lam(v, b) => {
+				v.hash(state);
+				b.hash(state);
+			}
+			App(l, r) => {
+				l.borrow().hash(state);
+				r.borrow().hash(state);
+			}
 		}
 	}
 }

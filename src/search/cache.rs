@@ -12,13 +12,13 @@ pub enum SearchResult {
 
 type Search = (Rc<Type>, usize);
 type PathDict = HashMap<Search, SearchResult>;
-type ConstDict = HashMap<i32, usize>;
+type SemanticDict = HashMap<Term, (Term, usize)>;
 
 pub struct Cache {
 	searches: Vec<Search>,
 	paths: Vec<PathDict>,
 	// Minimal sizes of representations of constants
-	consts: Vec<ConstDict>,
+	consts: Vec<SemanticDict>,
 	// Top element indicates whether pathdict should be popped.
 	pops: Vec<bool>,
 }
@@ -114,20 +114,27 @@ impl Cache {
 		ctxt: &Context,
 		term: Term,
 	) -> Option<Term> {
-		if **targ == Type::Int {
-			if let Term::Num(n) = ctxt.evaluate(&term) {
-				let cached = self
-					.consts
-					.last_mut()
-					.unwrap()
-					.entry(n)
-					.and_modify(|s| *s = (*s).min(size))
-					.or_insert(size);
+		let mut canon = term.deep_clone();
 
-				if *cached < size {
-					return None;
+		let canonized = (ctxt.canonizer)(&mut canon);
+
+		if canonized {
+			let entry = self.consts.last_mut().unwrap().entry(canon.clone());
+
+			use std::collections::hash_map::Entry::*;
+			match entry {
+				Occupied(mut entry) => {
+					let (minimal, m_size) = entry.get();
+					if *m_size < size || (*m_size == size && &term != minimal) {
+						return None;
+					} else {
+						*entry.get_mut() = (term.clone(), size);
+					}
 				}
-			}
+				e => {
+					e.or_insert((term.clone(), size));
+				}
+			};
 		}
 
 		let search = (targ.clone(), size);

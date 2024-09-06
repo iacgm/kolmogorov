@@ -1,5 +1,8 @@
 #[macro_export]
 macro_rules! term {
+	(_) => {
+		$crate::Term::Var("_")
+	};
 	($x: ident) => {
 		$crate::Term::Var(stringify!($x))
 	};
@@ -73,9 +76,20 @@ macro_rules! builtin {
 #[macro_export]
 macro_rules! context {
 	{$($def:ident),*} => {
-		Context::new(&[$(
-			(stringify!($def), $def.clone())
-		),*])
+		Context::new(
+			&[$(
+				(stringify!($def), $def.clone())
+			),*],
+			std::rc::Rc::new(|_| false)
+		)
+	};
+	{$($def:ident),* % $canonizer:expr } => {
+		Context::new(
+			&[$(
+				(stringify!($def), $def.clone())
+			),*],
+			std::rc::Rc::new($canonizer)
+		)
 	}
 }
 
