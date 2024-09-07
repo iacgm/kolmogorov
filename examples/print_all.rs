@@ -16,9 +16,11 @@ fn main() {
 
 		let mut count = 0;
 
-		for term in searcher {
+		for mut term in searcher {
 			count += 1;
 			println!("{}", term);
+			(ctx.canonize)(&mut term);
+			println!(" === {}\n", term);
 		}
 
 		println!(

@@ -114,11 +114,13 @@ impl Cache {
 		ctxt: &Context,
 		term: Term,
 	) -> Option<Term> {
-		let mut canon = term.deep_clone();
+		if !(ctxt.validate)(&term) {
+			return None;
+		}
 
-		let canonized = (ctxt.canonizer)(&mut canon);
+		let canonized = (ctxt.canonize)(&term);
 
-		if canonized {
+		if let Some(canon) = canonized {
 			let entry = self.consts.last_mut().unwrap().entry(canon.clone());
 
 			use std::collections::hash_map::Entry::*;

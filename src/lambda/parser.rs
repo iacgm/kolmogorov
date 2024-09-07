@@ -75,22 +75,21 @@ macro_rules! builtin {
 
 #[macro_export]
 macro_rules! context {
-	{$($def:ident),*} => {
+	{$($def:ident),* $(& $validate:ident)? $(% $canonize:ident)?} => {{
+		let validate = |_: &Term| true; // All terms valid by default
+		let canonize = |_: &Term| None; // No terms are canonized by default
+
+		$(let validate = $validate;)?
+		$(let canonize = $canonize;)?
+
 		Context::new(
 			&[$(
 				(stringify!($def), $def.clone())
 			),*],
-			std::rc::Rc::new(|_| false)
+			std::rc::Rc::new(validate),
+			std::rc::Rc::new(canonize)
 		)
-	};
-	{$($def:ident),* % $canonizer:expr } => {
-		Context::new(
-			&[$(
-				(stringify!($def), $def.clone())
-			),*],
-			std::rc::Rc::new($canonizer)
-		)
-	}
+	}};
 }
 
 #[macro_export]

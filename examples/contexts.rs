@@ -30,78 +30,22 @@ pub fn polynomials() -> Context {
 		| | => Num(1)
 	);
 
-	fn canonize(term: &mut Term) -> bool {
-		if let Var(v) = term {
-			if *v == "zero" {
-				*term = Num(0);
-			} else if *v == "one" {
-				*term = Num(1);
-			}
-		}
+	let disallowed_forms = [
+		term!(plus zero),
+		term!(plus _ zero),
+		term!(mult zero),
+		term!(mult _ zero),
+		term!(mult one),
+		term!(mult _ one),
+	];
 
-		if let Some(mut assignment) = term!(plus _ _).unify(term) {
-			let mut b = assignment.pop().unwrap();
-			let mut a = assignment.pop().unwrap();
+	let validate = move |term: &Term| {
+		disallowed_forms
+			.iter()
+			.all(|form| form.unify(term).is_none())
+	};
 
-			canonize(&mut a);
-			canonize(&mut b);
-
-			match (a, b) {
-				(Num(a), Num(b)) => {
-					*term = Num(a + b);
-				}
-				(Num(0), t) | (t, Num(0)) => {
-					*term = t;
-				}
-				(Num(a), b) => {
-					*term = term!(plus[b][Num(a)]);
-					return canonize(term);
-				}
-				(App(l, r), Num(a)) => {
-					if let Num(b) = &*l.borrow() {
-						*term = term!(plus[r.borrow()][Num(a + b)]);
-					} else if let Num(b) = &*r.borrow() {
-						*term = term!(plus[l.borrow()][Num(a + b)]);
-					}
-				}
-				_ => (),
-			}
-		} else if let Some(mut assignment) = term!(mult _ _).unify(term) {
-			let mut b = assignment.pop().unwrap();
-			let mut a = assignment.pop().unwrap();
-
-			canonize(&mut a);
-			canonize(&mut b);
-
-			match (a, b) {
-				(Num(a), Num(b)) => {
-					*term = Num(a * b);
-				}
-				(Num(0), _) | (_, Num(0)) => {
-					*term = Num(0);
-				}
-				(Num(1), t) | (t, Num(1)) => {
-					*term = t;
-				}
-				(Num(a), b) => {
-					*term = term!(mult[b][Num(a)]);
-					return canonize(term);
-				}
-				(App(l, r), Num(a)) => {
-					if let Num(b) = &*l.borrow() {
-						*term = term!(mult[r.borrow()][Num(a + b)]);
-					} else if let Num(b) = &*r.borrow() {
-						*term = term!(mult[l.borrow()][Num(a + b)]);
-					}
-				}
-				_ => (),
-			}
-		}
-
-		true
-	}
-
-	context! { plus, mult, zero, one % canonize}
+	context! { plus, mult, zero, one & validate}
 }
 
 #[allow(dead_code)]
@@ -124,50 +68,49 @@ pub fn sums() -> Context {
 	);
 
 	fn canonize(term: &mut Term) -> bool {
-		if let Var(v) = term {
-			if *v == "zero" {
+		match term {
+			Ref(r) => {
+				canonize(&mut r.borrow_mut());
+			}
+			Var("zero") => {
 				*term = Num(0);
 				return true;
-			} else if *v == "one" {
+			}
+			Var("one") => {
 				*term = Num(1);
 				return true;
-			} else {
-				return false;
 			}
+			App(l, r) => {
+				canonize(&mut l.borrow_mut());
+				canonize(&mut r.borrow_mut());
+			}
+			_ => (),
 		}
 
 		if let Some(mut assignment) = term!(plus _ _).unify(term) {
-			let mut b = assignment.pop().unwrap();
-			let mut a = assignment.pop().unwrap();
-
-			let mut canonized = false;
-
-			canonized |= canonize(&mut a);
-			canonized |= canonize(&mut b);
+			let b = assignment.pop().unwrap();
+			let a = assignment.pop().unwrap();
 
 			match (a, b) {
 				(Num(a), Num(b)) => {
 					*term = Num(a + b);
-					canonized = true;
 				}
+				(Num(0), t) | (t, Num(0)) => *term = t,
 				(App(l, r), Num(a)) | (Num(a), App(l, r)) => {
 					if let Num(b) = &*l.borrow() {
 						*term = term!(plus[r.borrow()][Num(a + b)]);
-						canonized = true;
 					} else if let Num(b) = &*r.borrow() {
 						*term = term!(plus[l.borrow()][Num(a + b)]);
-						canonized = true;
 					}
 				}
 				_ => (),
 			}
-			return canonized;
 		}
 
-		false
+		true
 	}
 
-	context! { plus, zero, one % canonize }
+	context! { plus, zero, one  }
 }
 
 #[allow(dead_code)]

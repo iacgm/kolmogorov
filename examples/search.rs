@@ -5,7 +5,7 @@ use contexts::*;
 
 fn main() {
 	let ctx = polynomials();
-	let ty = ty!((N => N) => N => N);
+	let ty = ty!(N => N);
 
 	for n in 2.. {
 		let start = std::time::Instant::now();

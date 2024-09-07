@@ -11,6 +11,6 @@ fn main() {
 	}; 
 
 	println!("Before: {}", term);
-	(*ctxt.canonizer)(&mut term);
+	(*ctxt.canonize)(&mut term);
 	println!("After : {}", term);
 }

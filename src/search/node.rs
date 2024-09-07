@@ -71,7 +71,7 @@ impl Node {
 									size,
 									&search_ctxt.ctxt,
 									term,
-								) {	
+								) {
 									return Some(term);
 								} else {
 									continue;
@@ -282,15 +282,23 @@ impl Node {
 						}
 					};
 
-					*state = Some(Box::new(Arg {
-						targ: targ.clone(),
-						size: size - arg_size - 1,
-						l_ty: ret_ty.clone(),
-						left: Term::App(left.clone(), arg.into()).into(),
-						state: None,
-						arg_state: None,
-						res: Unknown,
-					}))
+					let left = Term::App(left.clone(), arg.into());
+
+					let SearchContext { cache, ctxt, .. } = search_ctxt;
+
+					if let Some(term) = cache.yield_term(l_ty, left.size(), ctxt, left) {
+						*state = Some(Box::new(Arg {
+							targ: targ.clone(),
+							size: size - arg_size - 1,
+							l_ty: ret_ty.clone(),
+							left: term.into(),
+							state: None,
+							arg_state: None,
+							res: Unknown,
+						}))
+					} else {
+						return self.next(search_ctxt);
+					}
 				}
 				Nil => return None,
 			}
