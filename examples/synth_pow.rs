@@ -11,7 +11,7 @@ fn pow(n: i32) -> i32 {
 
 fn main() {
 	use Term::*;
-	let ctxt = polynomials();
+	let (ctxt, analyzer) = polynomials();
 	let targ = ty!(N => N => N);
 
 	let example = term!(p n -> mult p (plus one one));
@@ -22,7 +22,7 @@ fn main() {
 	for size in 1.. {
 		println!("Time: {}", total_time);
 		println!("Searching size {}:", size);
-		'search: for term in search(ctxt.clone(), &targ, size) {
+		'search: for term in search(ctxt.clone(), &targ, size, analyzer.clone()) {
 			for n in 1..5 {
 				let prev = pow(n - 1);
 				let expected = pow(n);

@@ -3,8 +3,10 @@
 // iterator enumerator, (while making caching & other optimizations
 // easier to implement & maintain)
 
+mod analysis;
 mod cache;
 mod node;
+pub use analysis::Semantics;
 use cache::*;
 use node::*;
 
@@ -12,7 +14,9 @@ use super::*;
 
 use std::rc::Rc;
 
-pub fn search(ctxt: Context, targ: &Type, size: usize) -> Enumerator {
+pub type Analyzer = Rc<dyn Fn(&Term) -> Semantics>;
+
+pub fn search(ctxt: Context, targ: &Type, size: usize, analyzer: Option<Analyzer>) -> Enumerator {
 	let vgen = ctxt.vgen();
 
 	Enumerator {
@@ -21,6 +25,7 @@ pub fn search(ctxt: Context, targ: &Type, size: usize) -> Enumerator {
 			vgen,
 			args: vec![],
 			cache: Cache::new(),
+			analyzer,
 		},
 		root: Node::All {
 			targ: Rc::new(targ.clone()),
@@ -41,6 +46,7 @@ type VarsVec = Vec<VarDecl>;
 
 struct SearchContext {
 	ctxt: Context,
+	analyzer: Option<Analyzer>,
 	vgen: VarGen,
 	// Variables from abstractions
 	args: VarsVec,

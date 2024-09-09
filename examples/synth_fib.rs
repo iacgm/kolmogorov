@@ -21,8 +21,8 @@ fn main() {
 	let example = term!(f n -> lte n one one (plus (f (minus n one)) (f (minus n two))));
 	println!("Example (|t| = {}): {}\n", example.size(), example);
 
-	let base_ctxt = fib_ctx();
-	let mut exec_ctxt = fib_ctx();
+	let (base_ctxt, _) = fib_ctx();
+	let (mut exec_ctxt, analyzer) = fib_ctx();
 
 	let limit = 8;
 	let fibs: Rc<Vec<i32>> = Rc::new((0..limit).map(fib).collect());
@@ -58,7 +58,7 @@ fn main() {
 		println!("Searching size: {}", size);
 
 		let mut search_start = Instant::now();
-		'search: for term in search(base_ctxt.clone(), &targ, size) {
+		'search: for term in search(base_ctxt.clone(), &targ, size, analyzer.clone()) {
 			let search_end = Instant::now();
 
 			search_time += search_end.duration_since(search_start).as_secs_f32();

@@ -6,22 +6,15 @@ use super::*;
 use rustc_hash::FxHashMap as HashMap;
 use std::rc::Rc;
 
-pub type Validator = Rc<dyn Fn(&Term) -> bool>;
-pub type Canonizer = Rc<dyn Fn(&Term) -> Option<Term>>;
-
 #[derive(Clone)]
 pub struct Context {
-	pub validate: Validator,
-	pub canonize: Canonizer,
 	defs: HashMap<Identifier, BuiltIn>,
 }
 
 impl Context {
-	pub fn new(defs: &[(Identifier, BuiltIn)], validate: Validator, canonize: Canonizer) -> Self {
+	pub fn new(defs: &[(Identifier, BuiltIn)]) -> Self {
 		Self {
 			defs: HashMap::from_iter(defs.iter().cloned()),
-			validate,
-			canonize,
 		}
 	}
 

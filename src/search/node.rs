@@ -69,7 +69,7 @@ impl Node {
 								if let Some(term) = search_ctxt.cache.yield_term(
 									targ,
 									size,
-									&search_ctxt.ctxt,
+									&search_ctxt.analyzer,
 									term,
 								) {
 									return Some(term);
@@ -284,9 +284,11 @@ impl Node {
 
 					let left = Term::App(left.clone(), arg.into());
 
-					let SearchContext { cache, ctxt, .. } = search_ctxt;
-
-					if let Some(term) = cache.yield_term(l_ty, left.size(), ctxt, left) {
+					if let Some(term) =
+						search_ctxt
+							.cache
+							.yield_term(l_ty, left.size(), &search_ctxt.analyzer, left)
+					{
 						*state = Some(Box::new(Arg {
 							targ: targ.clone(),
 							size: size - arg_size - 1,

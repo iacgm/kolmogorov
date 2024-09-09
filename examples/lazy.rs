@@ -4,7 +4,7 @@ mod contexts;
 use contexts::*;
 
 fn main() {
-	let ctxt = polynomials();
+	let (ctxt, _analyzer) = polynomials();
 
 	let program = term! {
 		plus(one)(1)

@@ -1,7 +1,7 @@
 use kolmogorov::*;
 
 #[allow(dead_code)]
-pub fn polynomials() -> Context {
+pub fn polynomials() -> (Context, Option<Analyzer>) {
 	use Term::*;
 
 	let plus = builtin!(
@@ -11,13 +11,7 @@ pub fn polynomials() -> Context {
 
 	let mult = builtin!(
 		N => N => N
-		|x, y| => {
-			if *x == Term::Num(0) || *y == Term::Num(0) {
-				Num(0)
-			} else {
-				Num(x.int()?*y.int()?)
-			}
-		}
+		|x, y| => Num(x.int()?*y.int()?)
 	);
 
 	let zero = builtin!(
@@ -39,82 +33,22 @@ pub fn polynomials() -> Context {
 		term!(mult _ one),
 	];
 
-	let validate = move |term: &Term| {
-		disallowed_forms
+	let analyzer = std::rc::Rc::new(move |term: &Term| {
+		if disallowed_forms
 			.iter()
-			.all(|form| form.unify(term).is_none())
-	};
+			.any(|form| form.unify(term).is_some())
+		{
+			Semantics::Malformed
+		} else {
+			Semantics::Unique
+		}
+	});
 
-	context! { plus, mult, zero, one & validate}
+	(context! { plus, mult, zero, one }, Some(analyzer))
 }
 
 #[allow(dead_code)]
-pub fn sums() -> Context {
-	use Term::*;
-
-	let plus = builtin!(
-		N => N => N
-		|x, y| => Num(x.int()?+y.int()?)
-	);
-
-	let zero = builtin!(
-		N
-		| | => Num(0)
-	);
-
-	let one = builtin!(
-		N
-		| | => Num(1)
-	);
-
-	fn canonize(term: &mut Term) -> bool {
-		match term {
-			Ref(r) => {
-				canonize(&mut r.borrow_mut());
-			}
-			Var("zero") => {
-				*term = Num(0);
-				return true;
-			}
-			Var("one") => {
-				*term = Num(1);
-				return true;
-			}
-			App(l, r) => {
-				canonize(&mut l.borrow_mut());
-				canonize(&mut r.borrow_mut());
-			}
-			_ => (),
-		}
-
-		if let Some(mut assignment) = term!(plus _ _).unify(term) {
-			let b = assignment.pop().unwrap();
-			let a = assignment.pop().unwrap();
-
-			match (a, b) {
-				(Num(a), Num(b)) => {
-					*term = Num(a + b);
-				}
-				(Num(0), t) | (t, Num(0)) => *term = t,
-				(App(l, r), Num(a)) | (Num(a), App(l, r)) => {
-					if let Num(b) = &*l.borrow() {
-						*term = term!(plus[r.borrow()][Num(a + b)]);
-					} else if let Num(b) = &*r.borrow() {
-						*term = term!(plus[l.borrow()][Num(a + b)]);
-					}
-				}
-				_ => (),
-			}
-		}
-
-		true
-	}
-
-	context! { plus, zero, one  }
-}
-
-#[allow(dead_code)]
-pub fn fib_ctx() -> Context {
+pub fn fib_ctx() -> (Context, Option<Analyzer>) {
 	use Term::*;
 
 	let lte = builtin!(
@@ -146,7 +80,7 @@ pub fn fib_ctx() -> Context {
 		| | => Num(2)
 	);
 
-	context! { lte, plus, minus, one, two }
+	(context! { lte, plus, minus, one, two }, None)
 }
 
 #[allow(dead_code)]

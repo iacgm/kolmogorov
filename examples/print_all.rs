@@ -4,7 +4,7 @@ mod contexts;
 use contexts::*;
 
 fn main() {
-	let ctx = polynomials();
+	let (ctxt, analyzer) = polynomials();
 
 	let ty = ty!(N => N);
 
@@ -12,15 +12,13 @@ fn main() {
 		println!("Round {}", n);
 		let start = std::time::Instant::now();
 
-		let searcher = search(ctx.clone(), &ty, n);
+		let searcher = search(ctxt.clone(), &ty, n, analyzer.clone());
 
 		let mut count = 0;
 
-		for mut term in searcher {
+		for term in searcher {
 			count += 1;
 			println!("{}", term);
-			(ctx.canonize)(&mut term);
-			println!(" === {}\n", term);
 		}
 
 		println!(

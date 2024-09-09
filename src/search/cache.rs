@@ -111,32 +111,33 @@ impl Cache {
 		&mut self,
 		targ: &Rc<Type>,
 		size: usize,
-		ctxt: &Context,
+		analyze: &Option<Analyzer>,
 		term: Term,
 	) -> Option<Term> {
-		if !(ctxt.validate)(&term) {
-			return None;
-		}
+		use Semantics::*;
+		if let Some(analyze) = analyze {
+			match analyze(&term) {
+				Malformed => return None,
+				Unique => (),
+				Canonical(canon) => {
+					let entry = self.consts.last_mut().unwrap().entry(canon.clone());
 
-		let canonized = (ctxt.canonize)(&term);
-
-		if let Some(canon) = canonized {
-			let entry = self.consts.last_mut().unwrap().entry(canon.clone());
-
-			use std::collections::hash_map::Entry::*;
-			match entry {
-				Occupied(mut entry) => {
-					let (minimal, m_size) = entry.get();
-					if *m_size < size || (*m_size == size && &term != minimal) {
-						return None;
-					} else {
-						*entry.get_mut() = (term.clone(), size);
-					}
+					use std::collections::hash_map::Entry::*;
+					match entry {
+						Occupied(mut entry) => {
+							let (minimal, m_size) = entry.get();
+							if *m_size < size || (*m_size == size && &term != minimal) {
+								return None;
+							} else {
+								*entry.get_mut() = (term.clone(), size);
+							}
+						}
+						e => {
+							e.or_insert((term.clone(), size));
+						}
+					};
 				}
-				e => {
-					e.or_insert((term.clone(), size));
-				}
-			};
+			}
 		}
 
 		let search = (targ.clone(), size);
