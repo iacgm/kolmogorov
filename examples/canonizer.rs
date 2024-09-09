@@ -4,15 +4,14 @@ mod contexts;
 use contexts::*;
 
 fn main() {
-	let (_ctxt, Some(analyzer)) = polynomials() else {
+	let (_ctxt, Some(analyze)) = polynomials() else {
 		unreachable!()
 	};
 
-	let mut term = term! {
-		plus(zero)(plus(one)(f))
+	let term = term! {
+		plus(f)(plus(one)(f))
 	};
 
-	println!("Before: {}", term);
-	analyzer(&mut term);
-	println!("After : {}", term);
+	println!("Term : {}", term);
+	println!("Canon: {}", analyze(&term));
 }

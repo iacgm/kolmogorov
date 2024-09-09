@@ -114,7 +114,7 @@ impl Cache {
 		analyze: &Option<Analyzer>,
 		term: Term,
 	) -> Option<Term> {
-		use Semantics::*;
+		use Analysis::*;
 		if let Some(analyze) = analyze {
 			match analyze(&term) {
 				Malformed => return None,

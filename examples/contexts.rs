@@ -1,5 +1,7 @@
 use kolmogorov::*;
 
+use std::rc::Rc;
+
 #[allow(dead_code)]
 pub fn polynomials() -> (Context, Option<Analyzer>) {
 	use Term::*;
@@ -33,54 +35,69 @@ pub fn polynomials() -> (Context, Option<Analyzer>) {
 		term!(mult _ one),
 	];
 
-	let analyzer = std::rc::Rc::new(move |term: &Term| {
+	use Analysis::*;
+	use std::cell::LazyCell;
+	fn canonize(term: &Term, disallowed_forms: &[Term]) -> Analysis {
 		if disallowed_forms
 			.iter()
 			.any(|form| form.unify(term).is_some())
 		{
-			Semantics::Malformed
-		} else {
-			Semantics::Unique
+			return Malformed;
 		}
-	});
+
+		let plus_pat = LazyCell::new(|| term!(plus _ _));
+		let mult_pat = LazyCell::new(|| term!(plus _ _));
+
+		use Term::*;
+		match term {
+			Ref(r) => canonize(&r.borrow(), disallowed_forms),
+			Var("zero") => Canonical(Num(0)),
+			Var("one") => Canonical(Num(1)),
+			Num(_) | Var(_) => Canonical(term.clone()),
+			Lam(_, b) => canonize(b, disallowed_forms),
+			App(_, _) => {
+				if let Some(mut unification) = plus_pat.unify(term) {
+					let r = unification.pop().unwrap();
+					let l = unification.pop().unwrap();
+
+					let (Canonical(lcan), Canonical(rcan)) = (
+						canonize(&l, disallowed_forms),
+						canonize(&r, disallowed_forms),
+					) else {
+						return Unique;
+					};
+
+					match (lcan, rcan) {
+						(Num(a), Num(b)) => Canonical(Num(a + b)),
+						(Num(n), t) | (t, Num(n)) => Canonical(term!(plus[t][Num(n)])),
+						_ => Unique,
+					}
+				} else if let Some(mut unification) = mult_pat.unify(term) {
+					let r = unification.pop().unwrap();
+					let l = unification.pop().unwrap();
+
+					let (Canonical(lcan), Canonical(rcan)) = (
+						canonize(&l, disallowed_forms),
+						canonize(&r, disallowed_forms),
+					) else {
+						return Unique;
+					};
+
+					match (lcan, rcan) {
+						(Num(a), Num(b)) => Canonical(Num(a * b)),
+						(Num(n), t) | (t, Num(n)) => Canonical(term!(mult[t][Num(n)])),
+						_ => Unique,
+					}
+				} else {
+					Unique
+				}
+			}
+		}
+	}
+
+	let analyzer = Rc::new(move |term: &Term| canonize(term, &disallowed_forms));
 
 	(context! { plus, mult, zero, one }, Some(analyzer))
-}
-
-#[allow(dead_code)]
-pub fn fib_ctx() -> (Context, Option<Analyzer>) {
-	use Term::*;
-
-	let lte = builtin!(
-		N => N => N => N => N
-		|a, b| => if a.int()? <= b.int()? {
-			term!(a b -> a)
-		} else {
-			term!(a b -> b)
-		}
-	);
-
-	let plus = builtin!(
-		N => N => N
-		|x, y| => Num(x.int()?+y.int()?)
-	);
-
-	let minus = builtin!(
-		N => N => N
-		|x, y| => Num(x.int()?-y.int()?)
-	);
-
-	let one = builtin!(
-		N
-		| | => Num(1)
-	);
-
-	let two = builtin!(
-		N
-		| | => Num(2)
-	);
-
-	(context! { lte, plus, minus, one, two }, None)
 }
 
 #[allow(dead_code)]

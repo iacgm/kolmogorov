@@ -6,7 +6,7 @@
 mod analysis;
 mod cache;
 mod node;
-pub use analysis::Semantics;
+pub use analysis::Analysis;
 use cache::*;
 use node::*;
 
@@ -14,7 +14,7 @@ use super::*;
 
 use std::rc::Rc;
 
-pub type Analyzer = Rc<dyn Fn(&Term) -> Semantics>;
+pub type Analyzer = Rc<dyn Fn(&Term) -> Analysis>;
 
 pub fn search(ctxt: Context, targ: &Type, size: usize, analyzer: Option<Analyzer>) -> Enumerator {
 	let vgen = ctxt.vgen();
