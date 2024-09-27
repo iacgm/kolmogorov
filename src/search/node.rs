@@ -2,7 +2,6 @@ use super::*;
 use std::rc::Rc;
 use SearchResult::*;
 
-#[derive(Debug)]
 pub(super) enum Node {
 	All {
 		targ: Rc<Type>,
@@ -27,6 +26,7 @@ pub(super) enum Node {
 		size: usize,
 		l_ty: Rc<Type>,
 		left: Thunk,
+		left_analysis: Analysis,
 		state: Option<Box<Node>>,
 		arg_state: Option<Box<Node>>,
 		res: SearchResult,
@@ -46,7 +46,7 @@ impl AllPhase {
 }
 
 impl Node {
-	pub fn next(&mut self, search_ctxt: &mut SearchContext) -> Option<Term> {
+	pub fn next(&mut self, search_ctxt: &mut SearchContext) -> Option<(Term, Analysis)> {
 		use Node::*;
 		loop {
 			//dbg!(&self);
@@ -65,14 +65,13 @@ impl Node {
 
 					if let Some(curr_state) = state {
 						match curr_state.next(search_ctxt) {
-							Some(term) => {
-								if let Some(term) = search_ctxt.cache.yield_term(
-									targ,
-									size,
-									&search_ctxt.analyzer,
-									term,
-								) {
-									return Some(term);
+							Some((term, analysis)) => {
+								if let Some(term) =
+									search_ctxt
+										.cache
+										.yield_term(targ, size, term, analysis.clone())
+								{
+									return Some((term, analysis));
 								} else {
 									continue;
 								}
@@ -129,7 +128,11 @@ impl Node {
 
 					if let Some(curr_state) = state {
 						return match curr_state.next(search_ctxt) {
-							Some(term) => Some(Term::Lam(ident, term.into())),
+							Some((term, analysis)) => {
+								let term = Term::Lam(ident, term.into());
+								let analysis = search_ctxt.lang.sabs(ident, analysis);
+								Some((term, analysis))
+							}
 							None => {
 								search_ctxt.args.pop().unwrap();
 								search_ctxt.vgen.freshen(ident);
@@ -170,17 +173,20 @@ impl Node {
 
 					if size == 1 {
 						if v_ty == *targ {
-							return Some(Term::Var(var));
+							return Some((Term::Var(var), search_ctxt.lang.svar(var)));
 						} else {
 							continue;
 						}
 					}
+
+					let analysis = search_ctxt.lang.svar(var);
 
 					*state = Some(Box::new(Arg {
 						targ: targ.clone(),
 						size: size - 1,
 						l_ty: v_ty,
 						left: Term::Var(var).into(),
+						left_analysis: analysis,
 						state: None,
 						arg_state: None,
 						res: Unknown,
@@ -192,6 +198,7 @@ impl Node {
 					size,
 					l_ty,
 					left,
+					left_analysis,
 					state,
 					arg_state,
 					res,
@@ -210,11 +217,16 @@ impl Node {
 					}
 
 					if size == 0 && targ == l_ty {
-						let Arg { left, .. } = std::mem::replace(self, Nil) else {
+						let Arg {
+							left,
+							left_analysis,
+							..
+						} = std::mem::replace(self, Nil)
+						else {
 							unreachable!()
 						};
 
-						return Some(left.borrow().clone());
+						return Some((left.borrow().clone(), left_analysis.clone()));
 					} else if size == 0 || targ == l_ty {
 						*self = Nil;
 						return None;
@@ -254,7 +266,7 @@ impl Node {
 					};
 
 					// Get the next arg, trying every size until we generate one.
-					let (arg, arg_size) = loop {
+					let ((arg, arg_analysis), arg_size) = loop {
 						let next_arg = arg_state.next(search_ctxt);
 
 						let All {
@@ -282,18 +294,20 @@ impl Node {
 						}
 					};
 
+					let analysis = search_ctxt.lang.sapp(left_analysis.clone(), arg_analysis);
 					let left = Term::App(left.clone(), arg.into());
 
 					if let Some(term) =
 						search_ctxt
 							.cache
-							.yield_term(l_ty, left.size(), &search_ctxt.analyzer, left)
+							.yield_term(l_ty, left.size(), left, analysis.clone())
 					{
 						*state = Some(Box::new(Arg {
 							targ: targ.clone(),
 							size: size - arg_size - 1,
 							l_ty: ret_ty.clone(),
 							left: term.into(),
+							left_analysis: analysis,
 							state: None,
 							arg_state: None,
 							res: Unknown,

@@ -1,103 +1,74 @@
 use kolmogorov::*;
 
-use std::rc::Rc;
+use Analysis::*;
+use Semantics::*;
 
-#[allow(dead_code)]
-pub fn polynomials() -> (Context, Option<Analyzer>) {
-	use Term::*;
-
-	let plus = builtin!(
-		N => N => N
-		|x, y| => Num(x.int()?+y.int()?)
-	);
-
-	let mult = builtin!(
-		N => N => N
-		|x, y| => Num(x.int()?*y.int()?)
-	);
-
-	let zero = builtin!(
-		N
-		| | => Num(0)
-	);
-
-	let one = builtin!(
-		N
-		| | => Num(1)
-	);
-
-	let disallowed_forms = [
-		term!(plus zero),
-		term!(plus _ zero),
-		term!(mult zero),
-		term!(mult _ zero),
-		term!(mult one),
-		term!(mult _ one),
-	];
-
-	use Analysis::*;
-	use std::cell::LazyCell;
-	fn canonize(term: &Term, disallowed_forms: &[Term]) -> Analysis {
-		if disallowed_forms
-			.iter()
-			.any(|form| form.unify(term).is_some())
-		{
-			return Malformed;
-		}
-
-		let plus_pat = LazyCell::new(|| term!(plus _ _));
-		let mult_pat = LazyCell::new(|| term!(plus _ _));
-
+#[derive(Clone)]
+pub struct Polynomials;
+impl Language for Polynomials {
+	fn context(&self) -> Context {
 		use Term::*;
-		match term {
-			Ref(r) => canonize(&r.borrow(), disallowed_forms),
-			Var("zero") => Canonical(Num(0)),
-			Var("one") => Canonical(Num(1)),
-			Num(_) | Var(_) => Canonical(term.clone()),
-			Lam(_, b) => canonize(b, disallowed_forms),
-			App(_, _) => {
-				if let Some(mut unification) = plus_pat.unify(term) {
-					let r = unification.pop().unwrap();
-					let l = unification.pop().unwrap();
+		let plus = builtin!(
+			N => N => N
+			|x, y| => Num(x.int()?+y.int()?)
+		);
 
-					let (Canonical(lcan), Canonical(rcan)) = (
-						canonize(&l, disallowed_forms),
-						canonize(&r, disallowed_forms),
-					) else {
-						return Unique;
-					};
+		let mult = builtin!(
+			N => N => N
+			|x, y| => Num(x.int()?*y.int()?)
+		);
 
-					match (lcan, rcan) {
-						(Num(a), Num(b)) => Canonical(Num(a + b)),
-						(Num(n), t) | (t, Num(n)) => Canonical(term!(plus[t][Num(n)])),
-						_ => Unique,
-					}
-				} else if let Some(mut unification) = mult_pat.unify(term) {
-					let r = unification.pop().unwrap();
-					let l = unification.pop().unwrap();
+		let zero = builtin!(
+			N
+			| | => Num(0)
+		);
 
-					let (Canonical(lcan), Canonical(rcan)) = (
-						canonize(&l, disallowed_forms),
-						canonize(&r, disallowed_forms),
-					) else {
-						return Unique;
-					};
+		let one = builtin!(
+			N
+			| | => Num(1)
+		);
 
-					match (lcan, rcan) {
-						(Num(a), Num(b)) => Canonical(Num(a * b)),
-						(Num(n), t) | (t, Num(n)) => Canonical(term!(mult[t][Num(n)])),
-						_ => Unique,
-					}
-				} else {
-					Unique
-				}
-			}
-		}
+		context! { plus, mult, zero, one }
 	}
 
-	let analyzer = Rc::new(move |term: &Term| canonize(term, &disallowed_forms));
+	fn svar(&self, v: Identifier) -> Analysis {
+		Canonical(match v {
+			"zero" => SNum(0),
+			"one" => SNum(1),
+			"plus" | "mult" => SApp(v, vec![]),
+			_ => SVar(v),
+		})
+	}
 
-	(context! { plus, mult, zero, one }, Some(analyzer))
+	fn sapp(&self, fun: Analysis, arg: Analysis) -> Analysis {
+		let (fun, arg) = match (fun, arg) {
+			(Unique, _) | (_, Unique) => return Unique,
+			(Malformed, _) | (_, Malformed) => return Malformed,
+			(Canonical(fun), Canonical(arg)) => (fun, arg),
+		};
+
+		match (fun, arg) {
+			(SApp("plus", _), SNum(0)) => Malformed,
+			(SApp("mult", _), SNum(0)) => Malformed,
+			(SApp("mult", _), SNum(1)) => Malformed,
+			(SApp("plus", mut v), SNum(a)) if !v.is_empty() && matches!(v[0], SNum(_)) => {
+				let SNum(b) = v[0] else { unreachable!() };
+				v[0] = SNum(a + b);
+				Canonical(SApp("plus", v))
+			}
+			(SApp("mult", mut v), SNum(a)) if !v.is_empty() && matches!(v[0], SNum(_)) => {
+				let SNum(b) = v[0] else { unreachable!() };
+				v[0] = SNum(a * b);
+				Canonical(SApp("mult", v))
+			}
+			(SApp(f, mut v), arg) => {
+				v.push(arg);
+				v.sort();
+				Canonical(SApp(f, v))
+			}
+			_ => unreachable!(),
+		}
+	}
 }
 
 #[allow(dead_code)]

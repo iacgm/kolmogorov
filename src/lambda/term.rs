@@ -166,8 +166,9 @@ impl From<Term> for Thunk {
 	}
 }
 
-impl std::fmt::Display for Term {
-	fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+use std::fmt::*;
+impl Display for Term {
+	fn fmt(&self, fmt: &mut Formatter<'_>) -> Result {
 		use Term::*;
 		match self {
 			Ref(r) => write!(fmt, "{}", (**r).borrow()),

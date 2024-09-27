@@ -4,13 +4,13 @@ mod contexts;
 use contexts::*;
 
 fn main() {
-	let (ctxt, analyzer) = polynomials();
+	let lang = Polynomials;
 	let ty = ty!(N => N);
 
 	for n in 2.. {
 		let start = std::time::Instant::now();
 
-		let searcher = search::search(ctxt.clone(), &ty, n, analyzer.clone());
+		let searcher = search::search(Box::new(lang.clone()), &ty, n);
 
 		let count: usize = searcher.count();
 

@@ -6,26 +6,30 @@
 mod analysis;
 mod cache;
 mod node;
-pub use analysis::Analysis;
+pub use analysis::*;
+
+use super::*;
 use cache::*;
 use node::*;
 
-use super::*;
-
 use std::rc::Rc;
 
-pub type Analyzer = Rc<dyn Fn(&Term) -> Analysis>;
+pub fn search(
+	lang: Box<dyn Language>,
+	targ: &Type,
+	size: usize,
+) -> Enumerator {
+	let ctxt = lang.context();
 
-pub fn search(ctxt: Context, targ: &Type, size: usize, analyzer: Option<Analyzer>) -> Enumerator {
 	let vgen = ctxt.vgen();
 
 	Enumerator {
 		search_ctxt: SearchContext {
+			lang,
 			ctxt,
 			vgen,
 			args: vec![],
 			cache: Cache::new(),
-			analyzer,
 		},
 		root: Node::All {
 			targ: Rc::new(targ.clone()),
@@ -45,8 +49,8 @@ type VarDecl = (Identifier, Rc<Type>);
 type VarsVec = Vec<VarDecl>;
 
 struct SearchContext {
+	lang: Box<dyn Language>,
 	ctxt: Context,
-	analyzer: Option<Analyzer>,
 	vgen: VarGen,
 	// Variables from abstractions
 	args: VarsVec,
@@ -97,6 +101,6 @@ impl Iterator for Enumerator {
 	fn next(&mut self) -> Option<Self::Item> {
 		self.root
 			.next(&mut self.search_ctxt)
-			.map(|t| Term::deep_clone(&t))
+			.map(|(t, _)| t.deep_clone())
 	}
 }

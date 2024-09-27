@@ -12,7 +12,7 @@ pub enum SearchResult {
 
 type Search = (Rc<Type>, usize);
 type PathDict = HashMap<Search, SearchResult>;
-type SemanticDict = HashMap<Term, (Term, usize)>;
+type SemanticDict = HashMap<Semantics, (Term, usize)>;
 
 pub struct Cache {
 	searches: Vec<Search>,
@@ -111,32 +111,30 @@ impl Cache {
 		&mut self,
 		targ: &Rc<Type>,
 		size: usize,
-		analyze: &Option<Analyzer>,
 		term: Term,
+		analysis: Analysis,
 	) -> Option<Term> {
 		use Analysis::*;
-		if let Some(analyze) = analyze {
-			match analyze(&term) {
-				Malformed => return None,
-				Unique => (),
-				Canonical(canon) => {
-					let entry = self.consts.last_mut().unwrap().entry(canon.clone());
+		match analysis {
+			Malformed => return None,
+			Unique => (),
+			Canonical(canon) => {
+				let entry = self.consts.last_mut().unwrap().entry(canon.clone());
 
-					use std::collections::hash_map::Entry::*;
-					match entry {
-						Occupied(mut entry) => {
-							let (minimal, m_size) = entry.get();
-							if *m_size < size || (*m_size == size && &term != minimal) {
-								return None;
-							} else {
-								*entry.get_mut() = (term.clone(), size);
-							}
+				use std::collections::hash_map::Entry::*;
+				match entry {
+					Occupied(mut entry) => {
+						let (minimal, m_size) = entry.get();
+						if *m_size < size || (*m_size == size && &term != minimal) {
+							return None;
+						} else {
+							*entry.get_mut() = (term.clone(), size);
 						}
-						e => {
-							e.or_insert((term.clone(), size));
-						}
-					};
-				}
+					}
+					e => {
+						e.or_insert((term.clone(), size));
+					}
+				};
 			}
 		}
 
