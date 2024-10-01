@@ -46,40 +46,8 @@ impl AllPhase {
 	pub const START: Self = Self::Application;
 }
 
-static mut DEPTH: usize = 0;
-static mut COUNT: usize = 0;
-
-struct Depth;
-impl Depth {
-	fn new() -> Self {
-		unsafe {
-			DEPTH += 1;
-		}
-		Self
-	}
-}
-impl Drop for Depth {
-	fn drop(&mut self) {
-		unsafe { DEPTH -= 1 };
-	}
-}
-
 impl Node {
 	pub fn next(&mut self, search_ctxt: &mut SearchContext) -> Option<(Term, Analysis)> {
-		let _depth = Depth::new();
-		unsafe {
-			if DEPTH == 1 {
-				COUNT += 1;
-			}
-			if COUNT == 17531 && DEPTH >= 30 {
-				println!(
-					"------------------------------{}------------------------------",
-					DEPTH
-				);
-				println!("{}", &self);
-			}
-		};
-
 		use Node::*;
 		loop {
 			match self {
