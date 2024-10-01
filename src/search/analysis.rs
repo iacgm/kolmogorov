@@ -2,14 +2,14 @@ use super::*;
 
 use std::fmt::*;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Analysis {
 	Malformed,            // Reject Term entirely (i.e, unnecessarily complex)
 	Unique,               // Allow, but did not construct canonical form
 	Canonical(Semantics), // Group into equivalence class by canonical form
 }
 
-#[derive(Hash, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Hash, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Semantics {
 	SNum(i32),
 	SVar(Identifier),
@@ -43,6 +43,17 @@ pub trait Language {
 				fun.app(arg);
 				Canonical(fun)
 			}
+		}
+	}
+
+	fn analyze(&self, term: &Term) -> Analysis {
+		use Term::*;
+		match term {
+			Num(n) => self.snum(*n),
+			Var(v) => self.svar(v),
+			Lam(i, b) => self.sabs(i, self.analyze(b)),
+			App(l, r) => self.sapp(self.analyze(&l.borrow()), self.analyze(&r.borrow())),
+			Ref(r) => self.analyze(&r.borrow()),
 		}
 	}
 }
@@ -93,9 +104,9 @@ impl Display for Analysis {
 	fn fmt(&self, f: &mut Formatter<'_>) -> Result {
 		use Analysis::*;
 		match self {
-			Malformed => write!(f, "Malformed"),
 			Unique => write!(f, "Unique"),
-			Canonical(term) => write!(f, "Canonical({})", term),
+			Malformed => write!(f, "Malformed"),
+			Canonical(sem) => write!(f, "Canonical({})", sem),
 		}
 	}
 }

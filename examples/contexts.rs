@@ -48,18 +48,27 @@ impl Language for Polynomials {
 		};
 
 		match (fun, arg) {
-			(SApp("plus", _), SNum(0)) => Malformed,
-			(SApp("mult", _), SNum(0)) => Malformed,
-			(SApp("mult", _), SNum(1)) => Malformed,
-			(SApp("plus", mut v), SNum(a)) if !v.is_empty() && matches!(v[0], SNum(_)) => {
+			(SApp("plus", v), SNum(0)) if v.len() <= 1 => Malformed,
+			(SApp("mult", v), SNum(0)) if v.len() <= 1 => Malformed,
+			(SApp("mult", v), SNum(1)) if v.len() <= 1 => Malformed,
+			(SApp("plus", v), SNum(a)) if matches!(&v[..], [SNum(_)]) => {
 				let SNum(b) = v[0] else { unreachable!() };
-				v[0] = SNum(a + b);
-				Canonical(SApp("plus", v))
+				Canonical(SNum(a + b))
 			}
-			(SApp("mult", mut v), SNum(a)) if !v.is_empty() && matches!(v[0], SNum(_)) => {
+			(SApp("mult", v), SNum(a)) if matches!(&v[..], [SNum(_)]) => {
 				let SNum(b) = v[0] else { unreachable!() };
-				v[0] = SNum(a * b);
-				Canonical(SApp("mult", v))
+				Canonical(SNum(a * b))
+			}
+			(SApp("plus", va), SApp("plus", mut vb))
+				if matches!(&va[..], [SNum(_)]) && matches!(&vb[..], [SNum(_), ..]) =>
+			{
+				let (SNum(a), SNum(b)) = (&va[0], &vb[0]) else {
+					unreachable!()
+				};
+
+				vb[0] = SNum(a + b);
+
+				Canonical(SApp("plus", vb))
 			}
 			(SApp(f, mut v), arg) => {
 				v.push(arg);

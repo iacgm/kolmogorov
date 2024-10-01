@@ -2,24 +2,25 @@ use super::*;
 use std::rc::Rc;
 use SearchResult::*;
 
+#[derive(Debug)]
 pub(super) enum Node {
 	All {
 		targ: Rc<Type>,
 		size: usize,
-		state: Option<Box<Node>>,
 		phase: AllPhase,
+		state: Option<Box<Node>>,
 	},
 	Abs {
 		targ: Rc<Type>,
 		size: usize,
-		state: Option<Box<Node>>,
 		ident: Option<Identifier>,
+		state: Option<Box<Node>>,
 	},
 	Var {
 		targ: Rc<Type>,
 		size: usize,
-		state: Option<Box<Node>>,
 		vars: VarsVec,
+		state: Option<Box<Node>>,
 	},
 	Arg {
 		targ: Rc<Type>,
@@ -27,9 +28,9 @@ pub(super) enum Node {
 		l_ty: Rc<Type>,
 		left: Thunk,
 		left_analysis: Analysis,
+		res: SearchResult,
 		state: Option<Box<Node>>,
 		arg_state: Option<Box<Node>>,
-		res: SearchResult,
 	},
 	Nil,
 }
@@ -45,11 +46,42 @@ impl AllPhase {
 	pub const START: Self = Self::Application;
 }
 
+static mut DEPTH: usize = 0;
+static mut COUNT: usize = 0;
+
+struct Depth;
+impl Depth {
+	fn new() -> Self {
+		unsafe {
+			DEPTH += 1;
+		}
+		Self
+	}
+}
+impl Drop for Depth {
+	fn drop(&mut self) {
+		unsafe { DEPTH -= 1 };
+	}
+}
+
 impl Node {
 	pub fn next(&mut self, search_ctxt: &mut SearchContext) -> Option<(Term, Analysis)> {
+		let _depth = Depth::new();
+		unsafe {
+			if DEPTH == 1 {
+				COUNT += 1;
+			}
+			if COUNT == 17531 && DEPTH >= 30 {
+				println!(
+					"------------------------------{}------------------------------",
+					DEPTH
+				);
+				println!("{}", &self);
+			}
+		};
+
 		use Node::*;
 		loop {
-			//dbg!(&self);
 			match self {
 				All {
 					targ,
@@ -313,7 +345,7 @@ impl Node {
 							res: Unknown,
 						}))
 					} else {
-						return self.next(search_ctxt);
+						continue;
 					}
 				}
 				Nil => return None,
@@ -347,5 +379,126 @@ impl Node {
 			}
 			Nil => {}
 		}
+	}
+}
+
+use std::fmt::*;
+impl Display for Node {
+	fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+		static mut DISP_DEPTH: usize = 0;
+		let indent = 4 * unsafe {
+			DISP_DEPTH += 1;
+			DISP_DEPTH - 1
+		};
+
+		use Node::*;
+		let out = match self {
+			All {
+				targ,
+				size,
+				phase,
+				state,
+			} => {
+				write!(
+					f,
+					"{:indent$}All {}, {}, {}: ",
+					"",
+					targ,
+					size,
+					phase,
+					indent = indent
+				)?;
+				if let Some(state) = state {
+					write!(f, "\n{}", state)
+				} else {
+					writeln!(f, "Nil")
+				}
+			}
+			Abs {
+				targ,
+				size,
+				ident,
+				state,
+			} => {
+				write!(
+					f,
+					"{:indent$}Abs {}, {}, {:?}: ",
+					"",
+					targ,
+					size,
+					ident,
+					indent = indent
+				)?;
+				if let Some(state) = state {
+					write!(f, "\n{}", state)
+				} else {
+					writeln!(f, "Nil")
+				}
+			}
+			Var {
+				targ,
+				size,
+				vars,
+				state,
+			} => {
+				write!(
+					f,
+					"{:indent$}Var {}, {}, {:?}: ",
+					"",
+					targ,
+					size,
+					vars,
+					indent = indent
+				)?;
+				if let Some(state) = state {
+					write!(f, "\n{}", state)
+				} else {
+					writeln!(f, "Nil")
+				}
+			}
+			Arg {
+				targ,
+				size,
+				l_ty,
+				left,
+				left_analysis,
+				res,
+				state,
+				arg_state,
+			} => {
+				write!(
+					f,
+					"{:indent$}Arg {}, {}, {:?}, left = {} ≈ {}, {}:",
+					"",
+					targ,
+					size,
+					res,
+					left.borrow(),
+					left_analysis,
+					l_ty,
+					indent = indent
+				)?;
+				if let Some(state) = state {
+					write!(f, "\n{:indent$}state:\n{}", "", state, indent = indent)?;
+				} else {
+					writeln!(f, "Nil ")?;
+				}
+				if let Some(state) = arg_state {
+					write!(f, "\n{:indent$}arg_state:\n{}", "", state, indent = indent)
+				} else {
+					writeln!(f, "Nil")
+				}
+			}
+			Nil => writeln!(f, "{:indent$}Nil", "", indent = indent),
+		};
+
+		unsafe { DISP_DEPTH -= 1 };
+		out
+	}
+}
+
+impl Display for AllPhase {
+	fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+		write!(f, "{:?}", self)
 	}
 }

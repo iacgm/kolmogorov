@@ -7,7 +7,7 @@ fn main() {
 	let lang = Polynomials;
 	let ty = ty!(N => N);
 
-	for n in 2.. {
+	for n in 30..=30 {
 		let start = std::time::Instant::now();
 
 		let searcher = search::search(Box::new(lang.clone()), &ty, n);

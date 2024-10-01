@@ -8,7 +8,7 @@ fn main() {
 
 	let ty = ty!(N => N);
 
-	for n in 2.. {
+	for n in 30.. {
 		println!("Round {}", n);
 		let start = std::time::Instant::now();
 
@@ -16,10 +16,14 @@ fn main() {
 
 		let mut count = 0;
 
-		for term in searcher {
+		for (term, analysis) in searcher {
 			count += 1;
-			println!("{}", term);
+			println!("\n{}", term);
+			if let Analysis::Canonical(sem) = analysis {
+				println!("{}", sem);
+			}
 		}
+		println!();
 
 		println!(
 			"These are all {:>6} known-distinct programs of type {} and size {}.",

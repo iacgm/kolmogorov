@@ -96,11 +96,11 @@ impl SearchContext {
 }
 
 impl Iterator for Enumerator {
-	type Item = Term;
+	type Item = (Term, Analysis);
 
 	fn next(&mut self) -> Option<Self::Item> {
 		self.root
 			.next(&mut self.search_ctxt)
-			.map(|(t, _)| t.deep_clone())
+			.map(|(t, a)| (t.deep_clone(), a))
 	}
 }
