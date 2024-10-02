@@ -35,7 +35,7 @@ impl Language for Polynomials {
 		Canonical(match v {
 			"zero" => SNum(0),
 			"one" => SNum(1),
-			"plus" | "mult" => SApp(v, vec![]),
+			"plus" | "mult" => SVar(v),
 			_ => SVar(v),
 		})
 	}
@@ -47,36 +47,118 @@ impl Language for Polynomials {
 			(Canonical(fun), Canonical(arg)) => (fun, arg),
 		};
 
-		match (fun, arg) {
-			(SApp("plus", v), SNum(0)) if v.len() <= 1 => Malformed,
-			(SApp("mult", v), SNum(0)) if v.len() <= 1 => Malformed,
-			(SApp("mult", v), SNum(1)) if v.len() <= 1 => Malformed,
+		//println!("In:  {} & {}", fun, arg);
+
+		let fun = match fun {
+			SApp(v, mut va) if matches!(&va[..], [SApp(f, _)] if *f == v) => va.remove(0),
+			_ => fun,
+		};
+
+		//println!("In:  {} & {}", fun, arg);
+
+		let out = match (fun, arg) {
+			(SApp("plus", _) | SVar("plus"), SNum(0)) => Malformed,
+			(SApp("mult", _) | SVar("mult"), SNum(0)) => Malformed,
+			(SApp("mult", _) | SVar("mult"), SNum(1)) => Malformed,
+
+			(SVar(v), arg) => Canonical(SApp(v, vec![arg])),
+
+			(SApp("plus", mut va), SApp("plus", mut vb))
+				if matches!((&va[..], &vb[..]), ([SNum(_), ..], [SNum(_), ..])) =>
+			{
+				let (SNum(a), SNum(b)) = (&va[0], vb.remove(0)) else {
+					unreachable!()
+				};
+
+				va[0] = SNum(a + b);
+
+				va.extend(vb);
+				va.sort();
+				Canonical(SApp("plus", va))
+			}
+			(SApp("mult", mut va), SApp("mult", mut vb))
+				if matches!((&va[..], &vb[..]), ([SNum(_), ..], [SNum(_), ..])) =>
+			{
+				let (SNum(a), SNum(b)) = (&va[0], vb.remove(0)) else {
+					unreachable!()
+				};
+
+				va[0] = SNum(a * b);
+
+				va.extend(vb);
+				va.sort();
+				Canonical(SApp("plus", va))
+			}
 			(SApp("plus", v), SNum(a)) if matches!(&v[..], [SNum(_)]) => {
 				let SNum(b) = v[0] else { unreachable!() };
 				Canonical(SNum(a + b))
+			}
+			(SApp("plus", mut v), SNum(a)) if matches!(&v[..], [SNum(_), ..]) => {
+				let SNum(b) = v[0] else { unreachable!() };
+				v[0] = SNum(a + b);
+				Canonical(SApp("plus", v))
 			}
 			(SApp("mult", v), SNum(a)) if matches!(&v[..], [SNum(_)]) => {
 				let SNum(b) = v[0] else { unreachable!() };
 				Canonical(SNum(a * b))
 			}
-			(SApp("plus", va), SApp("plus", mut vb))
-				if matches!(&va[..], [SNum(_)]) && matches!(&vb[..], [SNum(_), ..]) =>
-			{
-				let (SNum(a), SNum(b)) = (&va[0], &vb[0]) else {
+			(SApp("mult", mut v), SNum(a)) if matches!(&v[..], [SNum(_), ..]) => {
+				let SNum(b) = v[0] else { unreachable!() };
+				v[0] = SNum(a * b);
+				Canonical(SApp("mult", v))
+			}
+
+			(SApp("mult", va), SApp("plus", vb)) => {
+				let mut sems = vec![];
+
+				for term in vb {
+					let fun = SApp("mult", va.clone());
+					let analysis = self.sapp(Canonical(fun), Canonical(term));
+					match analysis {
+						Canonical(sem) => sems.push(sem),
+						_ => return analysis,
+					}
+				}
+
+				Canonical(SApp("plus", sems))
+			}
+
+			(SApp("mult", mut v), arg) if matches!(&v[..], [SApp("plus", _)]) => {
+				let SApp("plus", vb) = v.remove(0) else {
 					unreachable!()
 				};
 
-				vb[0] = SNum(a + b);
+				let mut sems = vec![];
 
-				Canonical(SApp("plus", vb))
+				let fun = SApp("mult", vec![arg]);
+				for term in vb {
+					let analysis = self.sapp(Canonical(fun.clone()), Canonical(term));
+					match analysis {
+						Canonical(sem) => sems.push(sem),
+						_ => return analysis,
+					}
+				}
+
+				Canonical(SApp("plus", sems))
 			}
+
+			(SApp(fa, mut va), SApp(fb, vb)) if fa == fb => {
+				va.extend(vb);
+				va.sort();
+				Canonical(SApp(fa, va))
+			}
+
 			(SApp(f, mut v), arg) => {
 				v.push(arg);
 				v.sort();
 				Canonical(SApp(f, v))
 			}
 			_ => unreachable!(),
-		}
+		};
+
+		//println!("out: {}", out);
+
+		out
 	}
 }
 

@@ -8,7 +8,7 @@ fn main() {
 
 	let ty = ty!(N => N);
 
-	for n in 30.. {
+	for n in 14..=14 {
 		println!("Round {}", n);
 		let start = std::time::Instant::now();
 
@@ -20,7 +20,7 @@ fn main() {
 			count += 1;
 			println!("\n{}", term);
 			if let Analysis::Canonical(sem) = analysis {
-				println!("{}", sem);
+				println!("≈ {}", sem);
 			}
 		}
 		println!();

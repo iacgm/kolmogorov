@@ -13,7 +13,7 @@ pub enum Analysis {
 pub enum Semantics {
 	SNum(i32),
 	SVar(Identifier),
-	SAbs(Identifier, Box<Semantics>),
+	SLam(Identifier, Box<Semantics>),
 	SApp(Identifier, Vec<Semantics>),
 }
 
@@ -32,7 +32,7 @@ pub trait Language {
 		match body {
 			Malformed => Malformed,
 			Unique => Unique,
-			Canonical(sem) => Canonical(SAbs(ident, sem.into())),
+			Canonical(sem) => Canonical(SLam(ident, sem.into())),
 		}
 	}
 	fn sapp(&self, fun: Analysis, arg: Analysis) -> Analysis {
@@ -65,8 +65,8 @@ impl Semantics {
 			SApp(_, args) => {
 				args.push(arg);
 			}
-			SAbs(_, _) => {
-				let SAbs(v, b) = std::mem::replace(self, SNum(0)) else {
+			SLam(_, _) => {
+				let SLam(v, b) = std::mem::replace(self, SNum(0)) else {
 					unreachable!()
 				};
 				*self = *b;
@@ -81,7 +81,7 @@ impl Semantics {
 		use Semantics::*;
 		match self {
 			SVar(v) if *v == var => *self = def,
-			SAbs(v, b) if *v != var => b.sub(var, def),
+			SLam(v, b) if *v != var => b.sub(var, def),
 			SApp(v, args) => {
 				for arg in args.iter_mut() {
 					arg.sub(var, def.clone());
@@ -117,10 +117,10 @@ impl Display for Semantics {
 		match self {
 			SNum(n) => write!(f, "{}", n),
 			SVar(v) => write!(f, "{}", v),
-			SAbs(v, b) => {
+			SLam(v, b) => {
 				write!(f, "(\\{}", v)?;
 				let mut r = &**b;
-				while let SAbs(v, next) = r {
+				while let SLam(v, next) = r {
 					write!(f, " {}", v)?;
 					r = &**next;
 				}
