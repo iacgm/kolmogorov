@@ -239,7 +239,7 @@ impl Node {
 					if *res == Unknown {
 						*res = search_ctxt.cache.prune_arg(targ, l_ty, size);
 
-						if *res == Uninhabited {
+						if *res == Exhausted(0) {
 							self.early_exit(search_ctxt);
 							*self = Nil;
 							return None;
@@ -297,7 +297,7 @@ impl Node {
 					let analysis = search_ctxt.lang.sapp(left_analysis.clone(), arg_analysis);
 					let left = Term::App(left.clone(), arg.into());
 
-					if let Some(term) =
+					if let Some(term) =	
 						search_ctxt
 							.cache
 							.yield_term(l_ty, left.size(), left, analysis.clone())

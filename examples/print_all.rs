@@ -8,7 +8,7 @@ fn main() {
 
 	let ty = ty!(N => N);
 
-	for n in 14..=14 {
+	for n in 6..=6 {
 		println!("Round {}", n);
 		let start = std::time::Instant::now();
 

@@ -6,8 +6,8 @@ use rustc_hash::FxHashMap as HashMap;
 pub enum SearchResult {
 	#[default]
 	Unknown,
-	Inhabited,
-	Uninhabited,
+	Searching(usize),
+	Exhausted(usize),
 }
 
 type Search = (Rc<Type>, usize);
@@ -19,8 +19,6 @@ pub struct Cache {
 	paths: Vec<PathDict>,
 	// Minimal sizes of representations of constants
 	consts: Vec<SemanticDict>,
-	// Top element indicates whether pathdict should be popped.
-	pops: Vec<bool>,
 }
 
 use SearchResult::*;
@@ -30,29 +28,37 @@ impl Cache {
 			searches: vec![],
 			paths: vec![Default::default()],
 			consts: vec![Default::default()],
-			pops: vec![],
 		}
 	}
 
 	pub fn intro_var(&mut self, is_new: bool) {
-		if is_new {
-			self.paths.push(Default::default());
-			self.consts.push(Default::default());
+		let mut new_paths = PathDict::default();
+
+		for (search, result) in self.active() {
+			match *result {
+				Exhausted(0) if !is_new => {
+					new_paths.insert(search.clone(), Exhausted(0));
+				}
+				Searching(n) | Exhausted(n) => {
+					new_paths.insert(search.clone(), Searching(n));
+				}
+				_ => (),
+			};
 		}
-		self.pops.push(is_new);
+
+		self.paths.push(new_paths);
+		self.consts.push(Default::default());
 	}
 
 	pub fn elim_var(&mut self) {
-		if self.pops.pop().unwrap() {
-			self.paths.pop();
-			self.consts.pop();
-		}
+		self.paths.pop();
+		self.consts.pop();
 	}
 
 	pub fn prune(&self, targ: &Rc<Type>, size: usize) -> bool {
 		let search = (targ.clone(), size);
 
-		self.active().get(&search) == Some(&Uninhabited)
+		self.active().get(&search) == Some(&Exhausted(0))
 	}
 
 	pub fn prune_arg(&self, targ: &Rc<Type>, l_ty: &Rc<Type>, size: usize) -> SearchResult {
@@ -60,35 +66,39 @@ impl Cache {
 			let last = l_ty == targ;
 
 			if size == 0 && last {
-				return Inhabited;
+				return Exhausted(1);
 			}
 
 			if size == 0 || last {
-				return Uninhabited;
+				return Exhausted(0);
 			}
 
 			let Type::Fun(arg, ret) = &**l_ty else {
 				unreachable!()
 			};
 
-			let mut res = Uninhabited;
+			let mut res = Unknown;
 			for n in 1..size {
 				let search = (arg.clone(), n);
 				let arg_res = *dict.get(&search).unwrap_or(&Unknown);
 
-				if arg_res == Uninhabited {
+				if arg_res == Exhausted(0) {
 					continue;
 				}
 
 				let rest = core(dict, targ, ret, size - n - 1);
 
-				if arg_res == Unknown && matches!(rest, Unknown | Inhabited) {
+				if arg_res.unknown() && rest != Exhausted(0) {
 					res = Unknown;
 					continue;
 				}
 
-				if arg_res == Inhabited && rest == Inhabited {
-					res = Inhabited;
+				let (Some(n), Some(m)) = (arg_res.count(), rest.count()) else {
+					continue;
+				};
+
+				if n != 0 && m != 0 {
+					res.inc(n * m);
 					break;
 				}
 			}
@@ -142,8 +152,8 @@ impl Cache {
 
 		self.active_mut()
 			.entry(search)
-			.and_modify(|r| *r = Inhabited)
-			.or_insert(Inhabited);
+			.and_modify(|r| r.inc(1))
+			.or_insert(Unknown);
 
 		Some(term)
 	}
@@ -153,9 +163,7 @@ impl Cache {
 
 		let result = self.active_mut().get_mut(&search).unwrap();
 
-		if *result == Unknown {
-			*result = Uninhabited;
-		}
+		result.finish();
 	}
 
 	fn active(&self) -> &PathDict {
@@ -164,5 +172,38 @@ impl Cache {
 
 	fn active_mut(&mut self) -> &mut PathDict {
 		self.paths.last_mut().unwrap()
+	}
+}
+
+impl SearchResult {
+	pub fn inc(&mut self, n: usize) {
+		match self {
+			Unknown => *self = Searching(n),
+			Searching(m) => *m += n,
+			_ => (),
+		};
+	}
+
+	pub fn finish(&mut self) {
+		match self {
+			Unknown => *self = Exhausted(0),
+			Searching(n) => *self = Exhausted(*n),
+			_ => (),
+		}
+	}
+
+	pub fn unknown(&self) -> bool {
+		matches!(self, Unknown | Searching(0))
+	}
+
+	pub fn count(&self) -> Option<usize> {
+		match *self {
+			Searching(n) | Exhausted(n) if n != 0 => Some(n),
+			_ => None,
+		}
+	}
+
+	pub fn inhabited(&self) -> bool {
+		matches!(self, Searching(n) | Exhausted(n) if *n != 0)
 	}
 }
