@@ -2,7 +2,7 @@ use super::*;
 
 use std::fmt::*;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Analysis {
 	Malformed,            // Reject Term entirely (i.e, unnecessarily complex)
 	Unique,               // Allow, but did not construct canonical form

@@ -2,20 +2,25 @@ use super::*;
 
 use rustc_hash::FxHashMap as HashMap;
 
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
-pub enum SearchResult {
-	#[default]
-	Unknown,
-	Inhabited,
-	Uninhabited,
-}
+const CACHE_SIZE: usize = 4;
 
 type Search = (Rc<Type>, usize);
+type Analyzed = (Term, Analysis);
 type PathDict = HashMap<Search, SearchResult>;
 type SemanticDict = HashMap<Semantics, (Term, usize)>;
 
+#[derive(Debug, Default, Clone)]
+pub enum SearchResult {
+	#[default]
+	Unknown,
+	Inhabited {
+		cache: Vec<Analyzed>,
+		state: Option<Box<Node>>,
+	},
+	Empty,
+}
+
 pub struct Cache {
-	searches: Vec<Search>,
 	paths: Vec<PathDict>,
 	// Minimal sizes of representations of constants
 	consts: Vec<SemanticDict>,
@@ -27,7 +32,6 @@ use SearchResult::*;
 impl Cache {
 	pub fn new() -> Self {
 		Self {
-			searches: vec![],
 			paths: vec![Default::default()],
 			consts: vec![Default::default()],
 			pops: vec![],
@@ -49,46 +53,47 @@ impl Cache {
 		}
 	}
 
-	pub fn prune(&self, targ: &Rc<Type>, size: usize) -> bool {
+	pub fn prune(&self, targ: &Rc<Type>, size: usize) -> &SearchResult {
 		let search = (targ.clone(), size);
 
-		self.active().get(&search) == Some(&Uninhabited)
+		self.active().get(&search).unwrap_or(&Unknown)
 	}
 
 	pub fn prune_arg(&self, targ: &Rc<Type>, l_ty: &Rc<Type>, size: usize) -> SearchResult {
 		fn core(dict: &PathDict, targ: &Rc<Type>, l_ty: &Rc<Type>, size: usize) -> SearchResult {
-			let last = l_ty == targ;
+			let done = l_ty == targ;
 
-			if size == 0 && last {
-				return Inhabited;
+			if size == 0 && done {
+				return SearchResult::LARGE;
 			}
 
-			if size == 0 || last {
-				return Uninhabited;
+			if size == 0 || done {
+				return Empty;
 			}
 
 			let Type::Fun(arg, ret) = &**l_ty else {
 				unreachable!()
 			};
 
-			let mut res = Uninhabited;
+
+			let mut res = Empty;
 			for n in 1..size {
 				let search = (arg.clone(), n);
-				let arg_res = *dict.get(&search).unwrap_or(&Unknown);
+				let arg_res = dict.get(&search).unwrap_or(&Unknown).clone();
 
-				if arg_res == Uninhabited {
+				if arg_res.empty() {
 					continue;
 				}
 
 				let rest = core(dict, targ, ret, size - n - 1);
 
-				if arg_res == Unknown && matches!(rest, Unknown | Inhabited) {
+				if arg_res.unknown() && !rest.empty() {
 					res = Unknown;
 					continue;
 				}
 
-				if arg_res == Inhabited && rest == Inhabited {
-					res = Inhabited;
+				if arg_res.inhabited() && rest.inhabited() {
+					res = SearchResult::LARGE;
 					break;
 				}
 			}
@@ -102,8 +107,6 @@ impl Cache {
 	pub fn begin_search(&mut self, targ: &Rc<Type>, size: usize) {
 		let search = (targ.clone(), size);
 
-		self.searches.push(search.clone());
-
 		self.active_mut().entry(search).or_insert(Unknown);
 	}
 
@@ -111,11 +114,12 @@ impl Cache {
 		&mut self,
 		targ: &Rc<Type>,
 		size: usize,
+		node: Option<&Node>,
 		term: Term,
 		analysis: Analysis,
 	) -> Option<Term> {
 		use Analysis::*;
-		match analysis {
+		match &analysis {
 			Malformed => return None,
 			Unique => (),
 			Canonical(canon) => {
@@ -142,19 +146,33 @@ impl Cache {
 
 		self.active_mut()
 			.entry(search)
-			.and_modify(|r| *r = Inhabited)
-			.or_insert(Inhabited);
+			.or_insert(Unknown)
+			.log(node, &term, analysis);
 
 		Some(term)
 	}
 
-	pub fn end_search(&mut self) {
-		let search = self.searches.pop().unwrap();
-
+	pub fn end_search(&mut self, search: Search) {
+		/* println!("Cache:");
+		for ((t, s), r) in self.active() {
+			print!("\t({}, {}) -> ", t, s);
+			match r {
+				Small(v) => {
+					print!("[");
+					for (t, _) in v {
+						print!("{},", t);
+					}
+					print!("]");
+				}
+				_ => print!("{:?}", r),
+			}
+			println!();
+		} */
+		
 		let result = self.active_mut().get_mut(&search).unwrap();
 
-		if *result == Unknown {
-			*result = Uninhabited;
+		if result.unknown() {
+			*result = Empty;
 		}
 	}
 
@@ -164,5 +182,51 @@ impl Cache {
 
 	fn active_mut(&mut self) -> &mut PathDict {
 		self.paths.last_mut().unwrap()
+	}
+}
+
+impl SearchResult {
+	pub const LARGE: Self = Inhabited {
+		cache: vec![],
+		state: None,
+	};
+
+	//Add to space
+	pub fn log(&mut self, node: Option<&Node>, term: &Term, analysis: Analysis) {
+		match self {
+			Unknown if CACHE_SIZE != 0 => {
+				*self = Inhabited {
+					cache: vec![(term.clone(), analysis.clone())],
+					state: node.map(|n| n.clone().into()),
+				}
+			}
+			Inhabited { cache, state } if !cache.is_empty() && cache.len() < CACHE_SIZE => {
+				cache.push((term.clone(), analysis.clone()));
+				let new_node = node.map(|n| Box::new(n.clone()));
+				if let Some(node) = new_node {
+					*state = Some(node);
+				}
+			}
+			Inhabited { cache, state } if cache.len() == CACHE_SIZE => {
+				*cache = vec![];
+				let new_node = node.map(|n| Box::new(n.clone()));
+				if let Some(node) = new_node {
+					*state = Some(node);
+				}
+			}
+			_ => (),
+		}
+	}
+
+	pub fn unknown(&self) -> bool {
+		matches!(self, Unknown)
+	}
+
+	pub fn empty(&self) -> bool {
+		matches!(self, Empty)
+	}
+
+	pub fn inhabited(&self) -> bool {
+		matches!(self, Inhabited { .. })
 	}
 }

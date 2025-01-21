@@ -2,7 +2,7 @@ use super::*;
 use std::rc::Rc;
 use SearchResult::*;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub(super) enum Node {
 	All {
 		targ: Rc<Type>,
@@ -32,25 +32,46 @@ pub(super) enum Node {
 		state: Option<Box<Node>>,
 		arg_state: Option<Box<Node>>,
 	},
+	Cached {
+		list: Vec<(Term, Analysis)>,
+		next: Box<Node>,
+	},
 	Nil,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum AllPhase {
+	CacheCheck,
 	Application,
 	Abstraction,
 	Completed,
+	CacheCompleted,
 }
 
 impl AllPhase {
-	pub const START: Self = Self::Application;
+	pub const START: Self = Self::CacheCheck;
 }
 
 impl Node {
 	pub fn next(&mut self, search_ctxt: &mut SearchContext) -> Option<(Term, Analysis)> {
 		use Node::*;
 		loop {
+			#[cfg(feature = "fulltrace")]
+			{
+				println!("============================");
+				println!("{}", &self);
+			}
+
 			match self {
+				Cached { list, next } => match list.pop() {
+					Some(x) => return Some(x),
+					None => {
+						let next = std::mem::replace(next.as_mut(), Nil);
+						*self = next;
+						self.late_start(search_ctxt);
+						continue;
+					}
+				},
 				All {
 					targ,
 					size,
@@ -66,11 +87,20 @@ impl Node {
 					if let Some(curr_state) = state {
 						match curr_state.next(search_ctxt) {
 							Some((term, analysis)) => {
-								if let Some(term) =
-									search_ctxt
-										.cache
-										.yield_term(targ, size, term, analysis.clone())
-								{
+								let this = All {
+									targ: targ.clone(),
+									size,
+									phase: *phase,
+									state: state.clone(),
+								};
+
+								if let Some(term) = search_ctxt.cache.yield_term(
+									targ,
+									size,
+									Some(&this),
+									term,
+									analysis.clone(),
+								) {
 									return Some((term, analysis));
 								} else {
 									continue;
@@ -82,13 +112,26 @@ impl Node {
 
 					use AllPhase::*;
 					match phase {
-						Application => {
-							if search_ctxt.cache.prune(targ, size) {
-								return None;
+						CacheCheck => {
+							match search_ctxt.cache.prune(targ, size) {
+								Inhabited {
+									cache,
+									state: cache_state,
+								} if !cache.is_empty() => {
+									*phase = CacheCompleted;
+									*state = Some(Box::new(Cached {
+										list: cache.clone(),
+										next: cache_state.clone().unwrap_or(Nil.into()),
+									}));
+									continue;
+								}
+								Empty => return None,
+								_ => *phase = Application,
 							}
-
 							search_ctxt.cache.begin_search(targ, size);
-
+							continue;
+						}
+						Application => {
 							*phase = Abstraction;
 							*state = Some(Box::new(Var {
 								targ: targ.clone(),
@@ -107,7 +150,11 @@ impl Node {
 							}))
 						}
 						Completed => {
-							search_ctxt.cache.end_search();
+							let search = (targ.clone(), size);
+							search_ctxt.cache.end_search(search);
+							return None;
+						}
+						CacheCompleted => {
 							return None;
 						}
 					};
@@ -236,10 +283,10 @@ impl Node {
 						unreachable!()
 					};
 
-					if *res == Unknown {
+					if res.unknown() {
 						*res = search_ctxt.cache.prune_arg(targ, l_ty, size);
 
-						if *res == Uninhabited {
+						if res.empty() {
 							self.early_exit(search_ctxt);
 							*self = Nil;
 							return None;
@@ -267,7 +314,10 @@ impl Node {
 
 					// Get the next arg, trying every size until we generate one.
 					let ((arg, arg_analysis), arg_size) = loop {
-						let next_arg = arg_state.next(search_ctxt);
+						if let Some(arg) = arg_state.next(search_ctxt) {
+							let size = arg.0.size();
+							break (arg, size);
+						}
 
 						let All {
 							size: arg_size,
@@ -279,29 +329,26 @@ impl Node {
 							unreachable!()
 						};
 
-						match next_arg {
-							Some(arg) => break (arg, *arg_size),
-							None => {
-								if *arg_size == size - 1 {
-									*self = Nil;
-									return None;
-								}
-
-								*arg_size += 1;
-								*phase = AllPhase::START;
-								*state = None;
-							}
+						if *arg_size == size - 1 {
+							*self = Nil;
+							return None;
 						}
+
+						*arg_size += 1;
+						*phase = AllPhase::START;
+						*state = None;
 					};
 
 					let analysis = search_ctxt.lang.sapp(left_analysis.clone(), arg_analysis);
 					let left = Term::App(left.clone(), arg.into());
 
-					if let Some(term) =
-						search_ctxt
-							.cache
-							.yield_term(l_ty, left.size(), left, analysis.clone())
-					{
+					if let Some(term) = search_ctxt.cache.yield_term(
+						l_ty,
+						left.size(),
+						None,
+						left,
+						analysis.clone(),
+					) {
 						*state = Some(Box::new(Arg {
 							targ: targ.clone(),
 							size: size - arg_size - 1,
@@ -312,8 +359,6 @@ impl Node {
 							arg_state: None,
 							res: Unknown,
 						}))
-					} else {
-						continue;
 					}
 				}
 				Nil => return None,
@@ -321,19 +366,67 @@ impl Node {
 		}
 	}
 
+	// Used to initialize a search at an arbitrary node (to skip ahead in caching)
+	pub fn late_start(&self, search_ctxt: &mut SearchContext) {
+		use Node::*;
+		match self {
+			All {
+				targ, size, state, ..
+			} => {
+				search_ctxt.cache.begin_search(targ, *size);
+				if let Some(state) = state.as_ref() {
+					state.late_start(search_ctxt);
+				}
+			}
+			Abs {
+				state: Some(state), ..
+			}
+			| Var {
+				state: Some(state), ..
+			} => state.late_start(search_ctxt),
+			Arg {
+				state, arg_state, ..
+			} => {
+				if let Some(state) = arg_state.as_ref() {
+					state.late_start(search_ctxt);
+				}
+				if let Some(state) = state.as_ref() {
+					state.late_start(search_ctxt);
+				}
+			}
+			_ => {}
+		}
+	}
+
+	//Used to end a search early (if pruning indicates emptiness)
 	pub fn early_exit(&mut self, search_ctxt: &mut SearchContext) {
 		use Node::*;
 		match self {
-			All { state, .. } => {
+			All {
+				state, targ, size, ..
+			} => {
+				#[cfg(feature = "trace")]
+				println!(
+					"Should be closing2: {},{} ({})",
+					targ,
+					size,
+					state.as_ref().unwrap_or(&Nil.into())
+				);
+
 				if let Some(state) = state.take().as_mut() {
 					state.early_exit(search_ctxt);
 				}
-				search_ctxt.cache.end_search();
+
+				let search = (targ.clone(), *size);
+				search_ctxt.cache.end_search(search);
 			}
-			Abs { state, .. } | Var { state, .. } => {
-				if let Some(state) = state.take().as_mut() {
-					state.early_exit(search_ctxt);
-				}
+			Abs {
+				state: Some(state), ..
+			}
+			| Var {
+				state: Some(state), ..
+			} => {
+				state.early_exit(search_ctxt);
 			}
 			Arg {
 				state, arg_state, ..
@@ -345,7 +438,7 @@ impl Node {
 					state.early_exit(search_ctxt);
 				}
 			}
-			Nil => {}
+			_ => {}
 		}
 	}
 }
@@ -361,6 +454,14 @@ impl Display for Node {
 
 		use Node::*;
 		let out = match self {
+			Cached { list, next } => {
+				write!(f, "{:indent$}Cached: [", "")?;
+				for (t, a) in list {
+					write!(f, "({} ≈ {}),", t, a)?;
+				}
+				writeln!(f, "]")?;
+				write!(f, "\n{:indent$}next_state:\n{}", "", next, indent = indent)
+			}
 			All {
 				targ,
 				size,
