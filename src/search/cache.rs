@@ -24,8 +24,6 @@ pub struct Cache {
 	paths: Vec<PathDict>,
 	// Minimal sizes of representations of constants
 	consts: Vec<SemanticDict>,
-	// Top element indicates whether pathdict should be popped.
-	pops: Vec<bool>,
 }
 
 use SearchResult::*;
@@ -34,23 +32,17 @@ impl Cache {
 		Self {
 			paths: vec![Default::default()],
 			consts: vec![Default::default()],
-			pops: vec![],
 		}
 	}
 
-	pub fn intro_var(&mut self, is_new: bool) {
-		if is_new {
-			self.paths.push(Default::default());
-			self.consts.push(Default::default());
-		}
-		self.pops.push(is_new);
+	pub fn intro_var(&mut self, _is_new: bool) {
+		self.paths.push(Default::default());
+		self.consts.push(Default::default());
 	}
 
 	pub fn elim_var(&mut self) {
-		if self.pops.pop().unwrap() {
-			self.paths.pop();
-			self.consts.pop();
-		}
+		self.paths.pop();
+		self.consts.pop();
 	}
 
 	pub fn prune(&self, targ: &Rc<Type>, size: usize) -> &SearchResult {
@@ -74,7 +66,6 @@ impl Cache {
 			let Type::Fun(arg, ret) = &**l_ty else {
 				unreachable!()
 			};
-
 
 			let mut res = Empty;
 			for n in 1..size {
@@ -168,7 +159,7 @@ impl Cache {
 			}
 			println!();
 		} */
-		
+
 		let result = self.active_mut().get_mut(&search).unwrap();
 
 		if result.unknown() {

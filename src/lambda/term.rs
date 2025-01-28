@@ -1,4 +1,5 @@
 use super::*;
+use rustc_hash::FxHashMap as HashMap;
 use std::cell::RefCell;
 use std::rc::Rc;
 

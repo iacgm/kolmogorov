@@ -6,11 +6,13 @@
 mod analysis;
 mod cache;
 mod node;
+mod scoped;
 pub use analysis::*;
 
 use super::*;
 use cache::*;
 use node::*;
+use scoped::*;
 
 use std::rc::Rc;
 
@@ -45,8 +47,8 @@ pub struct Enumerator {
 	root: Node,
 }
 
-type VarDecl = (Identifier, Rc<Type>);
-type VarsVec = Vec<VarDecl>;
+pub type VarDecl = (Identifier, Rc<Type>);
+pub type VarsVec = Vec<VarDecl>;
 
 struct SearchContext {
 	lang: Box<dyn Language>,
