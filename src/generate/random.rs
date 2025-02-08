@@ -6,7 +6,7 @@ use std::rc::Rc;
 const SMALL_SIZE: usize = 15;
 
 // Replaces a random small AST node with another AST of the same type
-pub fn mutate(lang: Box<dyn Language>, term: &Term, ty: Rc<Type>) -> Term {
+pub fn mutate(lang: Box<dyn Language>, term: &Term) -> Term {
 	let ctxt = lang.context();
 
 	let (replacement_node, metadata) = random_subnode(&ctxt, term, SMALL_SIZE);
@@ -18,23 +18,23 @@ pub fn mutate(lang: Box<dyn Language>, term: &Term, ty: Rc<Type>) -> Term {
 	replace_subnode(term, replacement_node, new)
 }
 
-fn replace_subnode(dest: &Term, node_id: usize, src: Term) -> Term {
+pub fn replace_subnode(dest: &Term, node_id: usize, src: Term) -> Term {
 	fn helper(counter: &mut usize, dest: &Term, node_id: usize, src: Term) -> Term {
+		*counter += 1;
+
 		if *counter == node_id {
 			return src;
 		}
-
-		*counter += 1;
 
 		use Term::*;
 		match dest {
 			Ref(r) => helper(counter, &(**r).borrow(), node_id, src),
 			Lam(v, b) => Lam(v, helper(counter, b, node_id, src).into()),
 			App(l, r) => {
-				let r = &(**r).borrow().clone();
-				let r = helper(counter, r, node_id, src.clone());
 				let l = &(**l).borrow().clone();
-				let l = helper(counter, l, node_id, src);
+				let l = helper(counter, l, node_id, src.clone());
+				let r = &(**r).borrow().clone();
+				let r = helper(counter, r, node_id, src);
 				App(l.into(), r.into())
 			}
 			_ => dest.clone(),
@@ -54,11 +54,10 @@ struct Metadata {
 // Reservoir sampling, again.
 // We return the index of the subnode (using pre-order numbering) & its size
 fn random_subnode(ctxt: &Context, term: &Term, max_size: usize) -> (usize, Metadata) {
-	let mut scope = VarsVec::default();
 	let mut selected_id: usize = 0;
 	let mut metadata = None;
 	let mut stack = vec![term.clone()];
-	let mut counter = 0;
+	let mut counter = 1;
 
 	while let Some(next) = stack.pop() {
 		let size = next.size();
