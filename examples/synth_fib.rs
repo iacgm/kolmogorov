@@ -90,7 +90,7 @@ fn main() {
 		println!("Searching size: {}", size);
 
 		let mut search_start = Instant::now();
-		'search: for term in search(base_ctxt.clone(), &targ, size, analyzer.clone()) {
+		'search: for (term, analysis) in search(base_ctxt.clone(), &targ, size, analyzer.clone()) {
 			let search_end = Instant::now();
 
 			search_time += search_end.duration_since(search_start).as_secs_f32();

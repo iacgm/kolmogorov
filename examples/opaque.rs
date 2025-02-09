@@ -29,3 +29,6 @@ impl Language for Opaque {
 		context! { plus, mult, one, zero }
 	}
 }
+
+#[allow(unused)]
+fn main() {}

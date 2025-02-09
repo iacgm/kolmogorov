@@ -54,9 +54,7 @@ impl Language for Polynomials {
 			_ => fun,
 		};
 
-		//println!("In:  {} & {}", fun, arg);
-
-		let out = match (fun, arg) {
+		match (fun, arg) {
 			(SApp("plus", _) | SVar("plus"), SNum(0)) => Malformed,
 			(SApp("mult", _) | SVar("mult"), SNum(0)) => Malformed,
 			(SApp("mult", _) | SVar("mult"), SNum(1)) => Malformed,
@@ -154,11 +152,7 @@ impl Language for Polynomials {
 				Canonical(SApp(f, v))
 			}
 			_ => unreachable!(),
-		};
-
-		//println!("out: {}", out);
-
-		out
+		}
 	}
 }
 

@@ -12,7 +12,7 @@ fn main() {
 		println!("Round {}", n);
 		let start = std::time::Instant::now();
 
-		let searcher = search(Box::new(lang.clone()), &ty, n);
+		let searcher = search(Box::new(lang.clone()), vec![], &ty, n);
 
 		let mut count = 0;
 

@@ -24,7 +24,7 @@ fn main() {
 	for size in 1.. {
 		println!("Time: {}", total_time);
 		println!("Searching size {}:", size);
-		'search: for (term, _) in search(lang.clone(), &targ, size) {
+		'search: for (term, _) in search(lang.clone(), vec![], &targ, size) {
 			for n in 1..5 {
 				let prev = pow(n - 1);
 				let expected = pow(n);

@@ -11,9 +11,14 @@ pub fn mutate(lang: Box<dyn Language>, term: &Term, ty: &Type) -> Term {
 
 	let (replacement_node, annotation) = random_subnode(&ctxt, term, ty, SMALL_SIZE);
 
-	let new = uniform_sample(search(lang, &annotation.ty, annotation.size))
-		.unwrap()
-		.0;
+	let new = uniform_sample(search(
+		lang,
+		annotation.defs,
+		&annotation.ty,
+		annotation.size,
+	))
+	.unwrap()
+	.0;
 
 	replace_subnode(term, replacement_node, new)
 }

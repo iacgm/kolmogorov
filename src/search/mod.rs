@@ -16,6 +16,7 @@ use std::rc::Rc;
 
 pub fn search(
 	lang: Box<dyn Language>,
+	vars: VarsVec,
 	targ: &Type,
 	size: usize,
 ) -> Enumerator {
@@ -28,7 +29,7 @@ pub fn search(
 			lang,
 			ctxt,
 			vgen,
-			args: vec![],
+			args: vars,
 			cache: Cache::new(),
 		},
 		root: Node::All {

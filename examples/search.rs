@@ -10,7 +10,7 @@ fn main() {
 	for n in 1.. {
 		let start = std::time::Instant::now();
 
-		let searcher = search::search(Box::new(lang.clone()), &ty, n);
+		let searcher = search::search(Box::new(lang.clone()), vec![], &ty, n);
 
 		let count: usize = searcher.count();
 
