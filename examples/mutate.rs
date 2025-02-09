@@ -6,9 +6,11 @@ use opaque::*;
 fn main() {
 	let lang = Opaque;
 
-	let inc = term!(plus one one);
+	let inc = term!(plus one);
 
-	let mutated = random::mutate(Box::new(lang), &inc);
+	let ty = ty!(N => N);
+
+	let mutated = random::mutate(Box::new(lang), &inc, &ty);
 
 	println!("Old: {}", inc);
 	println!("New: {}", mutated);

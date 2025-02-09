@@ -6,13 +6,11 @@
 mod analysis;
 mod cache;
 mod node;
-mod scoped;
 pub use analysis::*;
 
 use super::*;
 use cache::*;
 use node::*;
-use scoped::*;
 
 use std::rc::Rc;
 

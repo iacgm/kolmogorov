@@ -1,17 +1,17 @@
 use super::*;
 
 use rand::random_range;
-use std::rc::Rc;
+use rustc_hash::FxHashMap as HashMap;
 
 const SMALL_SIZE: usize = 15;
 
 // Replaces a random small AST node with another AST of the same type
-pub fn mutate(lang: Box<dyn Language>, term: &Term) -> Term {
+pub fn mutate(lang: Box<dyn Language>, term: &Term, ty: &Type) -> Term {
 	let ctxt = lang.context();
 
-	let (replacement_node, metadata) = random_subnode(&ctxt, term, SMALL_SIZE);
+	let (replacement_node, annotation) = random_subnode(&ctxt, term, ty, SMALL_SIZE);
 
-	let new = uniform_sample(search(lang, &metadata.ty, metadata.size))
+	let new = uniform_sample(search(lang, &annotation.ty, annotation.size))
 		.unwrap()
 		.0;
 
@@ -44,40 +44,33 @@ pub fn replace_subnode(dest: &Term, node_id: usize, src: Term) -> Term {
 	helper(&mut 0, dest, node_id, src)
 }
 
-// Metadata for a subnode
-struct Metadata {
-	size: usize,
-	ty: Rc<Type>,
-	defs: VarsVec, // Variables in scope
-}
-
 // Reservoir sampling, again.
 // We return the index of the subnode (using pre-order numbering) & its size
-fn random_subnode(ctxt: &Context, term: &Term, max_size: usize) -> (usize, Metadata) {
+fn random_subnode(ctxt: &Context, term: &Term, ty: &Type, max_size: usize) -> (usize, Annotation) {
 	let mut selected_id: usize = 0;
-	let mut metadata = None;
-	let mut stack = vec![term.clone()];
+	let mut stack = vec![(term.clone(), term as *const Term)];
 	let mut counter = 1;
 
-	while let Some(next) = stack.pop() {
+	let metadata = annotate_term(term, ctxt, ty);
+
+	let ptr = term as *const Term;
+	let mut annotation = metadata.get(&ptr).unwrap();
+
+	while let Some((next, ptr)) = stack.pop() {
 		let size = next.size();
 
 		if size <= max_size && random_range(0..counter) == 0 {
 			selected_id = counter;
-			metadata = Some(Metadata {
-				size,
-				ty: ctxt.infer_type(&next).into(),
-				defs: vec![],
-			});
+			annotation = metadata.get(&ptr).unwrap();
 		}
 
 		use Term::*;
 		match next {
-			Ref(r) => stack.push(r.borrow().clone()),
-			Lam(_, b) => stack.push((*b).clone()),
+			Ref(r) => stack.push((r.borrow().clone(), r.as_ptr())),
+			Lam(_, b) => stack.push(((*b).clone(), b.as_ref() as *const Term)),
 			App(l, r) => {
-				stack.push(r.borrow().clone());
-				stack.push(l.borrow().clone());
+				stack.push((r.borrow().clone(), r.as_ptr()));
+				stack.push((l.borrow().clone(), l.as_ptr()));
 			}
 			_ => (),
 		}
@@ -85,5 +78,107 @@ fn random_subnode(ctxt: &Context, term: &Term, max_size: usize) -> (usize, Metad
 		counter += 1;
 	}
 
-	(selected_id, metadata.unwrap())
+	(selected_id, annotation.clone())
+}
+
+#[derive(Clone)]
+struct Annotation {
+	size: usize,
+	ty: Type,
+	defs: VarsVec, // Variables in scope
+}
+
+type Metadata = HashMap<*const Term, Annotation>;
+
+// Can fail if Term is not in beta-nf
+fn annotate_term(term: &Term, ctxt: &Context, ty: &Type) -> Metadata {
+	fn annotate(
+		term: &Term,
+		ctxt: &Context,
+		ty: Option<&Type>,
+		map: &mut Metadata,
+		decls: &VarsVec,
+	) {
+		let ptr = term as *const Term;
+
+		if map.contains_key(&ptr) {
+			return;
+		}
+
+		use Term::*;
+		let annotation = match term {
+			Ref(r) => {
+				annotate(&r.borrow(), ctxt, ty, map, decls);
+
+				let ptr = r.as_ptr() as *const Term;
+
+				map.get(&ptr).unwrap().clone()
+			}
+			Num(_) => Annotation {
+				size: 1,
+				defs: decls.clone(),
+				ty: Type::Int,
+			},
+			Var(v) => {
+				if let Some((_, v_ty)) = decls.iter().find(|(s, _)| v == s) {
+					Annotation {
+						size: 1,
+						ty: (**v_ty).clone(),
+						defs: decls.clone(),
+					}
+				} else if let Some(builtin) = ctxt.get(v) {
+					Annotation {
+						size: 1,
+						ty: (*builtin.ty).clone(),
+						defs: decls.clone(),
+					}
+				} else {
+					panic!("Undeclared variable")
+				}
+			}
+			Lam(v, b) => {
+				let ty = ty.unwrap().clone();
+
+				let Type::Fun(arg, ret) = ty.clone() else {
+					unimplemented!()
+				};
+
+				let mut decls = decls.clone();
+				decls.push((v, arg.clone()));
+
+				annotate(b, ctxt, Some(ret.as_ref()), map, &decls);
+
+				Annotation {
+					size: term.size(),
+					ty,
+					defs: decls,
+				}
+			}
+			App(l, r) => {
+				let f = l.as_ptr() as *const Term;
+
+				annotate(&l.borrow(), ctxt, None, map, decls);
+
+				let f_note = map.get(&f).unwrap().clone();
+
+				let Type::Fun(arg, ret) = f_note.ty else {
+					unreachable!()
+				};
+
+				annotate(&r.borrow(), ctxt, Some(&*arg), map, decls);
+
+				Annotation {
+					size: term.size(),
+					ty: (*ret).clone(),
+					defs: f_note.defs,
+				}
+			}
+		};
+
+		map.insert(ptr, annotation);
+	}
+
+	let mut map = Metadata::default();
+	annotate(term, ctxt, Some(ty), &mut map, &vec![]);
+	map
 }
