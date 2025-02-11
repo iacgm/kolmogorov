@@ -2,7 +2,7 @@ use super::*;
 
 use rustc_hash::FxHashMap as HashMap;
 
-const CACHE_SIZE: usize = 4;
+const CACHE_SIZE: usize = 8;
 
 type Search = (Rc<Type>, usize);
 type Analyzed = (Term, Analysis);
@@ -15,6 +15,7 @@ pub enum SearchResult {
 	Unknown,
 	Inhabited {
 		cache: Vec<Analyzed>,
+		count: usize,
 		state: Option<Box<Node>>,
 	},
 	Empty,
@@ -179,6 +180,7 @@ impl Cache {
 impl SearchResult {
 	pub const LARGE: Self = Inhabited {
 		cache: vec![],
+		count: 0,
 		state: None,
 	};
 
@@ -188,24 +190,40 @@ impl SearchResult {
 			Unknown if CACHE_SIZE != 0 => {
 				*self = Inhabited {
 					cache: vec![(term.clone(), analysis.clone())],
+					count: 1,
 					state: node.map(|n| n.clone().into()),
 				}
 			}
-			Inhabited { cache, state } if !cache.is_empty() && cache.len() < CACHE_SIZE => {
+			Inhabited {
+				cache,
+				count,
+				state,
+			} if (1..CACHE_SIZE).contains(count) => {
 				cache.push((term.clone(), analysis.clone()));
+				*count += 1;
 				let new_node = node.map(|n| Box::new(n.clone()));
 				if let Some(node) = new_node {
 					*state = Some(node);
 				}
 			}
-			Inhabited { cache, state } if cache.len() == CACHE_SIZE => {
+			Inhabited {
+				cache,
+				state,
+				count,
+			} if *count == CACHE_SIZE => {
 				*cache = vec![];
+				*count += 1;
 				let new_node = node.map(|n| Box::new(n.clone()));
 				if let Some(node) = new_node {
 					*state = Some(node);
 				}
 			}
-			_ => (),
+			Inhabited { count, .. } if *count > CACHE_SIZE => {
+				*count += 1;
+			}
+			_ => {
+				unreachable!()
+			}
 		}
 	}
 

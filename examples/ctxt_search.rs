@@ -5,12 +5,13 @@ use opaque::*;
 
 fn main() {
 	let lang = Opaque;
-	let ty = ty!(N => N);
+
+	let ty = ty!(N);
 
 	for n in 1.. {
 		let start = std::time::Instant::now();
 
-		let searcher = search::search(&lang, vec![], &ty, n);
+		let searcher = search::search(&lang, vec![("var", Type::Int.into())], &ty, n);
 
 		let count = searcher.count();
 

@@ -117,6 +117,7 @@ impl Node {
 								Inhabited {
 									cache,
 									state: cache_state,
+									..
 								} if !cache.is_empty() => {
 									*phase = CacheCompleted;
 									*state = Some(Box::new(Cached {

@@ -3,24 +3,156 @@ use super::*;
 use rand::random_range;
 use rustc_hash::FxHashMap as HashMap;
 
+// Probability of replacing a variable with another
+const REPLACE_VAR: f64 = 0.7;
+// Probability of replacing a small (non-variable) subterm with another of equal size
+const REPLACE_SMALL: f64 = 0.29;
+// Probability of replacing a larger subterm with anohter, potentially of different size
+// This is much more computationally expensive and can erase a lot of progress, but also
+// allows us to exit local minima (we must calculate g(x'|x) & g(x|x'), involving a census
+// of terms we don't even use, so it should be much more unlikely than the others).
+#[allow(unused)]
+const REPLACE_LARGE: f64 = 1. - REPLACE_VAR - REPLACE_SMALL;
+
+// Max size of `small` terms. (TODO: Make language-dependent)
 const SMALL_SIZE: usize = 15;
 
-// Replaces a random small AST node with another AST of the same type
-pub fn mutate(lang: Box<dyn Language>, term: &Term, ty: &Type) -> Term {
+// Max size of `large` terms. (TODO: Make language-dependent)
+const LARGE_SIZE: usize = 20;
+
+// How often we print out progress
+const PRINT_SPACE: usize = 100;
+
+pub fn metropolis<F: FnMut(&Term) -> f64>(
+	lang: &dyn Language,
+	start: &Term,
+	ty: &Type,
+	mut scorer: F,
+	iterations: usize,
+) -> Term {
+	let mut candidate = start.clone();
+	let mut score = scorer(start);
+
+	let mut best_candidate = start.clone();
+	let mut best_score = 0.;
+
+	for i in 0..iterations {
+		if i % PRINT_SPACE == 0 {
+			println!("Metropolis progress: {}/{}", i, iterations);
+		}
+
+		// g_ratio = g(x|x') / g(x'|x)
+		let Some((proposal, g_ratio)) = mutate(lang, &candidate, ty) else {
+			continue;
+		};
+
+		let proposal_score = scorer(&proposal);
+
+		if proposal_score > best_score {
+			best_score = proposal_score;
+			best_candidate = proposal.clone();
+		}
+
+		let score_ratio = proposal_score / score;
+
+		let acceptance_prob = score_ratio * g_ratio;
+
+		if with_probability(acceptance_prob) {
+			candidate = proposal;
+			score = proposal_score;
+		}
+	}
+
+	best_candidate
+}
+
+// Mutates a &Term. Also returns g(x|x') / g(x'|x) [where x' is the proposal]
+pub fn mutate(lang: &dyn Language, term: &Term, ty: &Type) -> Option<(Term, f64)> {
 	let ctxt = lang.context();
 
-	let (replacement_node, annotation) = random_subnode(&ctxt, term, ty, SMALL_SIZE);
+	use Replacement::*;
+	match Replacement::choose_replacement_kind() {
+		HVar => {
+			let (replacement_node, annotation, _) = random_subnode(&ctxt, term, ty, 1, 1);
 
-	let new = uniform_sample(search(
-		lang,
-		annotation.defs,
-		&annotation.ty,
-		annotation.size,
-	))
-	.unwrap()
-	.0;
+			let (_, proposal) = reservoir_sample(search(
+				lang,
+				annotation.defs,
+				&annotation.ty,
+				annotation.size,
+			));
 
-	replace_subnode(term, replacement_node, new)
+			let (new_term, _analysis) = proposal.unwrap();
+
+			let candidate = replace_subnode(term, replacement_node, new_term);
+
+			Some((candidate, 1.))
+		}
+		Small => {
+			let (replacement_node, annotation, _) = random_subnode(&ctxt, term, ty, 2, SMALL_SIZE);
+
+			let (_, replacement) = reservoir_sample(search(
+				lang,
+				annotation.defs,
+				&annotation.ty,
+				annotation.size,
+			));
+
+			let (new_term, _analysis) = replacement.unwrap();
+
+			let candidate = replace_subnode(term, replacement_node, new_term);
+
+			Some((candidate, 1.))
+		}
+		Large => {
+			let (replacement_node, annotation, subnode_count) =
+				random_subnode(&ctxt, term, ty, 2, LARGE_SIZE);
+
+			let replacement_size = rand::random_range(1..LARGE_SIZE);
+
+			println!(
+				"Counting (Used):   {} {} {:?}",
+				annotation.ty, replacement_size, annotation.defs
+			);
+
+
+			let (new_count, replacement) = reservoir_sample(search(
+				lang,
+				annotation.defs.clone(),
+				&annotation.ty,
+				replacement_size,
+			));
+
+			let (replacement, _analysis) = replacement?;
+
+			let proposal = replace_subnode(term, replacement_node, replacement);
+
+			println!(
+				"Counting (Unused): {} {} {:?}",
+				annotation.ty, annotation.size, annotation.defs
+			);
+
+			let old_count = search(lang, annotation.defs, &annotation.ty, annotation.size).count();
+
+			// g1 = g(x' | x)
+			let g1 = g(subnode_count, new_count);
+
+			let (_, _, subnode_count) = random_subnode(&ctxt, term, ty, 2, LARGE_SIZE);
+			//g2 = g(x | x')
+			let g2 = g(subnode_count, old_count);
+
+			Some((proposal, g2 / g1))
+		}
+	}
+}
+
+// g(x2 | x1)
+fn g(x1_subnode_count: usize, x2_num_replacement_terms: usize) -> f64 {
+	let prob_subnode_selected = 1. / x1_subnode_count as f64;
+
+	let prob_replacement_generated = 1. / x2_num_replacement_terms as f64;
+
+	prob_subnode_selected * prob_replacement_generated
 }
 
 pub fn replace_subnode(dest: &Term, node_id: usize, src: Term) -> Term {
@@ -51,7 +183,14 @@ pub fn replace_subnode(dest: &Term, node_id: usize, src: Term) -> Term {
 
 // Reservoir sampling, again.
 // We return the index of the subnode (using pre-order numbering) & its size
-fn random_subnode(ctxt: &Context, term: &Term, ty: &Type, max_size: usize) -> (usize, Annotation) {
+// Returns (node_id, annotation, small_node_count)
+fn random_subnode(
+	ctxt: &Context,
+	term: &Term,
+	ty: &Type,
+	min_size: usize,
+	max_size: usize,
+) -> (usize, Annotation, usize) {
 	let mut selected_id: usize = 0;
 	let mut stack = vec![(term.clone(), term as *const Term)];
 	let mut counter = 1;
@@ -64,7 +203,7 @@ fn random_subnode(ctxt: &Context, term: &Term, ty: &Type, max_size: usize) -> (u
 	while let Some((next, ptr)) = stack.pop() {
 		let size = next.size();
 
-		if size <= max_size && random_range(0..counter) == 0 {
+		if (min_size..=max_size).contains(&size) && random_range(0..counter) == 0 {
 			selected_id = counter;
 			annotation = metadata.get(&ptr).unwrap();
 		}
@@ -83,10 +222,10 @@ fn random_subnode(ctxt: &Context, term: &Term, ty: &Type, max_size: usize) -> (u
 		counter += 1;
 	}
 
-	(selected_id, annotation.clone())
+	(selected_id, annotation.clone(), counter - 1)
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct Annotation {
 	size: usize,
 	ty: Type,
@@ -186,4 +325,24 @@ fn annotate_term(term: &Term, ctxt: &Context, ty: &Type) -> Metadata {
 	let mut map = Metadata::default();
 	annotate(term, ctxt, Some(ty), &mut map, &vec![]);
 	map
+}
+
+enum Replacement {
+	HVar,
+	Small,
+	Large,
+}
+
+impl Replacement {
+	pub fn choose_replacement_kind() -> Self {
+		let rand = random();
+
+		if rand < REPLACE_VAR {
+			Self::HVar
+		} else if rand < REPLACE_VAR + REPLACE_SMALL {
+			Self::Small
+		} else {
+			Self::Large
+		}
+	}
 }

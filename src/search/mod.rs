@@ -14,12 +14,12 @@ use node::*;
 
 use std::rc::Rc;
 
-pub fn search(
-	lang: Box<dyn Language>,
+pub fn search<'a>(
+	lang: &'a dyn Language,
 	vars: VarsVec,
 	targ: &Type,
 	size: usize,
-) -> Enumerator {
+) -> Enumerator<'a> {
 	let ctxt = lang.context();
 
 	let vgen = ctxt.vgen();
@@ -41,16 +41,16 @@ pub fn search(
 	}
 }
 
-pub struct Enumerator {
-	search_ctxt: SearchContext,
+pub struct Enumerator<'a> {
+	search_ctxt: SearchContext<'a>,
 	root: Node,
 }
 
 pub type VarDecl = (Identifier, Rc<Type>);
 pub type VarsVec = Vec<VarDecl>;
 
-struct SearchContext {
-	lang: Box<dyn Language>,
+struct SearchContext<'a> {
+	lang: &'a dyn Language,
 	ctxt: Context,
 	vgen: VarGen,
 	// Variables from abstractions
@@ -58,7 +58,7 @@ struct SearchContext {
 	cache: Cache,
 }
 
-impl SearchContext {
+impl<'a> SearchContext<'a> {
 	fn contains_var_of_type(&self, ty: &Rc<Type>) -> bool {
 		let args = self.args.iter().map(|(_, t)| t);
 		let ctxt = self.ctxt.iter().map(|(_, b)| &b.ty);
@@ -96,7 +96,7 @@ impl SearchContext {
 	}
 }
 
-impl Iterator for Enumerator {
+impl<'a> Iterator for Enumerator<'a> {
 	type Item = (Term, Analysis);
 
 	fn next(&mut self) -> Option<Self::Item> {

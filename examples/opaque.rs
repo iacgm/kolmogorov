@@ -6,6 +6,11 @@ pub struct Opaque;
 impl Language for Opaque {
 	fn context(&self) -> Context {
 		use Term::*;
+		let pads = builtin!(
+			N => N
+			|x| => x
+		);
+
 		let plus = builtin!(
 			N => N => N
 			|x, y| => Num(x.int()?+y.int()?)
@@ -26,7 +31,7 @@ impl Language for Opaque {
 			| | => Num(0)
 		);
 
-		context! { plus, mult, one, zero }
+		context! { pads, plus, mult, one, zero }
 	}
 }
 
