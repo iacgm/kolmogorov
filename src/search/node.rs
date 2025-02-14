@@ -3,38 +3,38 @@ use std::rc::Rc;
 use SearchResult::*;
 
 #[derive(Clone, Debug)]
-pub(super) enum Node {
+pub(super) enum Node<L: Language> {
 	All {
 		targ: Rc<Type>,
 		size: usize,
 		phase: AllPhase,
-		state: Option<Box<Node>>,
+		state: Option<Box<Node<L>>>,
 	},
 	Abs {
 		targ: Rc<Type>,
 		size: usize,
 		ident: Option<Identifier>,
-		state: Option<Box<Node>>,
+		state: Option<Box<Node<L>>>,
 	},
 	Var {
 		targ: Rc<Type>,
 		size: usize,
 		vars: VarsVec,
-		state: Option<Box<Node>>,
+		state: Option<Box<Node<L>>>,
 	},
 	Arg {
 		targ: Rc<Type>,
 		size: usize,
 		l_ty: Rc<Type>,
 		left: Thunk,
-		left_analysis: Analysis,
-		res: SearchResult,
-		state: Option<Box<Node>>,
-		arg_state: Option<Box<Node>>,
+		left_analysis: Analysis<L>,
+		res: SearchResult<L>,
+		state: Option<Box<Node<L>>>,
+		arg_state: Option<Box<Node<L>>>,
 	},
 	Cached {
-		list: Vec<(Term, Analysis)>,
-		next: Box<Node>,
+		list: Vec<(Term, Analysis<L>)>,
+		next: Box<Node<L>>,
 	},
 	Nil,
 }
@@ -52,8 +52,8 @@ impl AllPhase {
 	pub const START: Self = Self::CacheCheck;
 }
 
-impl Node {
-	pub fn next(&mut self, search_ctxt: &mut SearchContext) -> Option<(Term, Analysis)> {
+impl<L: Language> Node<L> {
+	pub fn next(&mut self, search_ctxt: &mut SearchContext<L>) -> Option<(Term, Analysis<L>)> {
 		use Node::*;
 		loop {
 			#[cfg(feature = "fulltrace")]
@@ -178,7 +178,7 @@ impl Node {
 						return match curr_state.next(search_ctxt) {
 							Some((term, analysis)) => {
 								let term = Term::Lam(ident, term.into());
-								let analysis = search_ctxt.lang.sabs(ident, analysis);
+								let analysis = search_ctxt.lang.slam(ident, analysis);
 								Some((term, analysis))
 							}
 							None => {
@@ -368,7 +368,7 @@ impl Node {
 	}
 
 	// Used to initialize a search at an arbitrary node (to skip ahead in caching)
-	pub fn late_start(&self, search_ctxt: &mut SearchContext) {
+	pub fn late_start(&self, search_ctxt: &mut SearchContext<L>) {
 		use Node::*;
 		match self {
 			All {
@@ -400,7 +400,7 @@ impl Node {
 	}
 
 	//Used to end a search early (if pruning indicates emptiness)
-	pub fn early_exit(&mut self, search_ctxt: &mut SearchContext) {
+	pub fn early_exit(&mut self, search_ctxt: &mut SearchContext<L>) {
 		use Node::*;
 		match self {
 			All {
@@ -445,7 +445,7 @@ impl Node {
 }
 
 use std::fmt::*;
-impl Display for Node {
+impl<L: Language + Debug> Display for Node<L> {
 	fn fmt(&self, f: &mut Formatter<'_>) -> Result {
 		static mut DISP_DEPTH: usize = 0;
 		let indent = 4 * unsafe {

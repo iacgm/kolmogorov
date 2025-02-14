@@ -6,7 +6,10 @@
 mod analysis;
 mod cache;
 mod node;
+mod semantics;
+
 pub use analysis::*;
+pub use semantics::*;
 
 use super::*;
 use cache::*;
@@ -14,12 +17,12 @@ use node::*;
 
 use std::rc::Rc;
 
-pub fn search<'a>(
-	lang: &'a dyn Language,
+pub fn search<'a, L: Language>(
+	lang: &'a L,
 	vars: VarsVec,
 	targ: &Type,
 	size: usize,
-) -> Enumerator<'a> {
+) -> Enumerator<'a, L> {
 	let ctxt = lang.context();
 
 	let vgen = ctxt.vgen();
@@ -41,24 +44,24 @@ pub fn search<'a>(
 	}
 }
 
-pub struct Enumerator<'a> {
-	search_ctxt: SearchContext<'a>,
-	root: Node,
+pub struct Enumerator<'a, L: Language> {
+	search_ctxt: SearchContext<'a, L>,
+	root: Node<L>,
 }
 
 pub type VarDecl = (Identifier, Rc<Type>);
 pub type VarsVec = Vec<VarDecl>;
 
-struct SearchContext<'a> {
-	lang: &'a dyn Language,
+struct SearchContext<'a, L: Language> {
+	lang: &'a L,
 	ctxt: Context,
 	vgen: VarGen,
 	// Variables from abstractions
 	args: VarsVec,
-	cache: Cache,
+	cache: Cache<L>,
 }
 
-impl<'a> SearchContext<'a> {
+impl<'a, L: Language> SearchContext<'a, L> {
 	fn contains_var_of_type(&self, ty: &Rc<Type>) -> bool {
 		let args = self.args.iter().map(|(_, t)| t);
 		let ctxt = self.ctxt.iter().map(|(_, b)| &b.ty);
@@ -96,8 +99,8 @@ impl<'a> SearchContext<'a> {
 	}
 }
 
-impl<'a> Iterator for Enumerator<'a> {
-	type Item = (Term, Analysis);
+impl<'a, L: Language> Iterator for Enumerator<'a, L> {
+	type Item = (Term, Analysis<L>);
 
 	fn next(&mut self) -> Option<Self::Item> {
 		self.root

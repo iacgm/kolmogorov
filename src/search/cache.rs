@@ -5,30 +5,30 @@ use rustc_hash::FxHashMap as HashMap;
 const CACHE_SIZE: usize = 8;
 
 type Search = (Rc<Type>, usize);
-type Analyzed = (Term, Analysis);
-type PathDict = HashMap<Search, SearchResult>;
-type SemanticDict = HashMap<Semantics, (Term, usize)>;
+type Analyzed<L> = (Term, Analysis<L>);
+type PathDict<L> = HashMap<Search, SearchResult<L>>;
+type SemanticDict<L> = HashMap<<L as Language>::Semantics, (Term, usize)>;
 
 #[derive(Debug, Default, Clone)]
-pub enum SearchResult {
+pub enum SearchResult<L: Language> {
 	#[default]
 	Unknown,
 	Inhabited {
-		cache: Vec<Analyzed>,
+		cache: Vec<Analyzed<L>>,
 		count: usize,
-		state: Option<Box<Node>>,
+		state: Option<Box<Node<L>>>,
 	},
 	Empty,
 }
 
-pub struct Cache {
-	paths: Vec<PathDict>,
+pub struct Cache<L: Language> {
+	paths: Vec<PathDict<L>>,
 	// Minimal sizes of representations of constants
-	consts: Vec<SemanticDict>,
+	consts: Vec<SemanticDict<L>>,
 }
 
 use SearchResult::*;
-impl Cache {
+impl<L: Language> Cache<L> {
 	pub fn new() -> Self {
 		Self {
 			paths: vec![Default::default()],
@@ -46,18 +46,23 @@ impl Cache {
 		self.consts.pop();
 	}
 
-	pub fn prune(&self, targ: &Rc<Type>, size: usize) -> &SearchResult {
+	pub fn prune(&self, targ: &Rc<Type>, size: usize) -> &SearchResult<L> {
 		let search = (targ.clone(), size);
 
 		self.active().get(&search).unwrap_or(&Unknown)
 	}
 
-	pub fn prune_arg(&self, targ: &Rc<Type>, l_ty: &Rc<Type>, size: usize) -> SearchResult {
-		fn core(dict: &PathDict, targ: &Rc<Type>, l_ty: &Rc<Type>, size: usize) -> SearchResult {
+	pub fn prune_arg(&self, targ: &Rc<Type>, l_ty: &Rc<Type>, size: usize) -> SearchResult<L> {
+		fn core<L: Language>(
+			dict: &PathDict<L>,
+			targ: &Rc<Type>,
+			l_ty: &Rc<Type>,
+			size: usize,
+		) -> SearchResult<L> {
 			let done = l_ty == targ;
 
 			if size == 0 && done {
-				return SearchResult::LARGE;
+				return SearchResult::large();
 			}
 
 			if size == 0 || done {
@@ -85,7 +90,7 @@ impl Cache {
 				}
 
 				if arg_res.inhabited() && rest.inhabited() {
-					res = SearchResult::LARGE;
+					res = SearchResult::large();
 					break;
 				}
 			}
@@ -106,9 +111,9 @@ impl Cache {
 		&mut self,
 		targ: &Rc<Type>,
 		size: usize,
-		node: Option<&Node>,
+		node: Option<&Node<L>>,
 		term: Term,
-		analysis: Analysis,
+		analysis: Analysis<L>,
 	) -> Option<Term> {
 		use Analysis::*;
 		match &analysis {
@@ -168,24 +173,26 @@ impl Cache {
 		}
 	}
 
-	fn active(&self) -> &PathDict {
+	fn active(&self) -> &PathDict<L> {
 		self.paths.last().unwrap()
 	}
 
-	fn active_mut(&mut self) -> &mut PathDict {
+	fn active_mut(&mut self) -> &mut PathDict<L> {
 		self.paths.last_mut().unwrap()
 	}
 }
 
-impl SearchResult {
-	pub const LARGE: Self = Inhabited {
-		cache: vec![],
-		count: 0,
-		state: None,
-	};
+impl<L: Language> SearchResult<L> {
+	pub fn large() -> Self {
+		Inhabited {
+			cache: vec![],
+			count: 0,
+			state: None,
+		}
+	}
 
 	//Add to space
-	pub fn log(&mut self, node: Option<&Node>, term: &Term, analysis: Analysis) {
+	pub fn log(&mut self, node: Option<&Node<L>>, term: &Term, analysis: Analysis<L>) {
 		match self {
 			Unknown if CACHE_SIZE != 0 => {
 				*self = Inhabited {

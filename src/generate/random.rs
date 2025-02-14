@@ -23,8 +23,8 @@ const LARGE_SIZE: usize = 20;
 // How often we print out progress
 const PRINT_SPACE: usize = 100;
 
-pub fn metropolis<F: FnMut(&Term) -> f64>(
-	lang: &dyn Language,
+pub fn metropolis<F: FnMut(&Term) -> f64, L: Language>(
+	lang: &L,
 	start: &Term,
 	ty: &Type,
 	mut scorer: F,
@@ -67,7 +67,7 @@ pub fn metropolis<F: FnMut(&Term) -> f64>(
 }
 
 // Mutates a &Term. Also returns g(x|x') / g(x'|x) [where x' is the proposal]
-pub fn mutate(lang: &dyn Language, term: &Term, ty: &Type) -> Option<(Term, f64)> {
+pub fn mutate<L: Language>(lang: &L, term: &Term, ty: &Type) -> Option<(Term, f64)> {
 	let ctxt = lang.context();
 
 	use Replacement::*;
@@ -114,7 +114,6 @@ pub fn mutate(lang: &dyn Language, term: &Term, ty: &Type) -> Option<(Term, f64)
 				"Counting (Used):   {} {} {:?}",
 				annotation.ty, replacement_size, annotation.defs
 			);
-
 
 			let (new_count, replacement) = reservoir_sample(search(
 				lang,

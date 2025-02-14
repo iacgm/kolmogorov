@@ -4,11 +4,13 @@ use kolmogorov::*;
 pub struct Opaque;
 
 impl Language for Opaque {
+	type Semantics = ();
+
 	fn context(&self) -> Context {
 		use Term::*;
 		let pads = builtin!(
 			N => N
-			|x| => x
+			|x| => x.clone()
 		);
 
 		let plus = builtin!(
@@ -33,6 +35,10 @@ impl Language for Opaque {
 
 		context! { pads, plus, mult, one, zero }
 	}
+}
+
+impl Semantics for () {
+	
 }
 
 #[allow(unused)]
