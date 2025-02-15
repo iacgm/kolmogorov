@@ -12,6 +12,12 @@ pub enum Analysis<L: Language> {
 pub trait Language: Sized + Clone {
 	type Semantics: Semantics + Sized;
 
+	// Max size of `small` terms. (TODO: Make language-dependent)
+	const SMALL_SIZE: usize = 12;
+
+	// Max size of `large` terms. (TODO: Make language-dependent)
+	const LARGE_SIZE: usize = 18;
+
 	fn context(&self) -> Context;
 
 	fn snum(&self, _: i32) -> Analysis<Self>;

@@ -19,10 +19,10 @@ fn main() {
 			let program = term! {
 				[t] [Num(x)]
 			};
-
-			println!("> {}", &program);
-
-			let output = lang_ctxt.evaluate(&program).int().unwrap();
+			
+			let evaled = lang_ctxt.evaluate(&program);
+			
+			let output = evaled.int().unwrap();
 
 			if output == y {
 				num_correct += 1;
@@ -36,7 +36,7 @@ fn main() {
 
 	let ty = ty!(N => N);
 
-	let iterations = 1000;
+	let iterations = 1500;
 
 	let metropolis_search = metropolis(&lang, &start, &ty, scorer, iterations);
 

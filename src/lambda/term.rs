@@ -112,6 +112,22 @@ impl Term {
 			_ => None,
 		}
 	}
+
+	pub fn in_beta_normal_form(&self) -> bool {
+		use Term::*;
+		match self {
+			Ref(r) => r.borrow().in_beta_normal_form(),
+			Num(_) | Var(_) => true,
+			Lam(_, b) => b.in_beta_normal_form(),
+			App(l, r) => {
+				if let Lam(_, _) = &*l.borrow() {
+					false
+				} else {
+					r.borrow().in_beta_normal_form()
+				}
+			}
+		}
+	}
 }
 
 //Syntactic equality, not α-equality (might be useful to implement eventually)

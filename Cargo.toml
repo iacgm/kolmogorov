@@ -13,8 +13,8 @@ fulltrace=["trace"]
 mimalloc = "*"
 rustc-hash = "2.0.0"
 smallvec = "1.13"
-rand = "0.9"
-rand_distr = "0.5"
+rand = "0.8"
+statrs = {version = "0.18", features = ["rand"]}
 
 [profile.release]
 codegen-units = 1
