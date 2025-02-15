@@ -5,9 +5,9 @@ use rustc_hash::FxHashMap as HashMap;
 use statrs::distribution::Discrete;
 
 // Probability of replacing a variable with another
-const REPLACE_VAR: f64 = 0.7;
+const REPLACE_VAR: f64 = 0.5;
 // Probability of replacing a small (non-variable) subterm with another of equal size
-const REPLACE_SMALL: f64 = 0.25;
+const REPLACE_SMALL: f64 = 0.45;
 // Probability of replacing a larger subterm with anohter, potentially of different size
 // This is much more computationally expensive and can erase a lot of progress, but also
 // allows us to exit local minima (we must calculate g(x'|x) & g(x|x'), involving a census
@@ -45,10 +45,6 @@ pub fn metropolis<F: FnMut(&Term) -> f64, L: Language>(
 		let Some((proposal, g_ratio)) = mutate(lang, &candidate, ty) else {
 			continue;
 		};
-
-		if !proposal.in_beta_normal_form() {
-			continue;
-		}
 
 		let proposal_score = scorer(&proposal);
 
@@ -105,9 +101,13 @@ pub fn mutate<L: Language>(lang: &L, term: &Term, ty: &Type) -> Option<(Term, f6
 
 			let (new_term, _analysis) = replacement.unwrap();
 
-			let candidate = replace_subnode(term, replacement_node, new_term);
+			let proposal = replace_subnode(term, replacement_node, new_term);
 
-			Some((candidate, 1.))
+			if !proposal.in_beta_normal_form() {
+				return None;
+			}
+
+			Some((proposal, 1.))
 		}
 		Large => {
 			use rand::distributions::Distribution;
@@ -133,12 +133,16 @@ pub fn mutate<L: Language>(lang: &L, term: &Term, ty: &Type) -> Option<(Term, f6
 
 			let proposal = replace_subnode(term, replacement_node, replacement);
 
+			if !proposal.in_beta_normal_form() {
+				return None;
+			}
+
 			let old_count = search(lang, annotation.decls, &annotation.ty, annotation.size).count();
 
 			// g1 = g(x' | x)
 			let g1 = g::<L>(subnode_count, replacement_size, annotation.size, new_count);
 
-			let (_, _, subnode_count) = random_subnode(&ctxt, term, ty, 2, L::LARGE_SIZE);
+			let (_, _, subnode_count) = random_subnode(&ctxt, &proposal, ty, 2, L::LARGE_SIZE);
 			//g2 = g(x | x')
 			let g2 = g::<L>(subnode_count, annotation.size, replacement_size, old_count);
 

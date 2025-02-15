@@ -120,12 +120,19 @@ impl Term {
 			Num(_) | Var(_) => true,
 			Lam(_, b) => b.in_beta_normal_form(),
 			App(l, r) => {
-				if let Lam(_, _) = &*l.borrow() {
-					false
-				} else {
-					r.borrow().in_beta_normal_form()
-				}
+				!l.borrow().is_lam()
+					&& l.borrow().in_beta_normal_form()
+					&& r.borrow().in_beta_normal_form()
 			}
+		}
+	}
+
+	fn is_lam(&self) -> bool {
+		use Term::*;
+		match self {
+			Ref(r) => r.borrow().is_lam(),
+			Lam(_, _) => true,
+			_ => false,
 		}
 	}
 }
