@@ -118,7 +118,7 @@ pub fn mutate<L: Language>(lang: &L, term: &Term, ty: &Type) -> Option<(Term, f6
 
 			let ratio = annotation.size as f64 / L::LARGE_SIZE as f64;
 
-			let size_distr = Binomial::new(ratio, L::LARGE_SIZE as u64).unwrap();
+			let size_distr = Binomial::new(ratio, L::LARGE_SIZE as u64).ok()?;
 			let replacement_size: u64 = size_distr.sample(&mut rand::thread_rng());
 			let replacement_size = replacement_size as usize;
 

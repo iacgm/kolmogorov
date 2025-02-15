@@ -13,10 +13,10 @@ pub trait Language: Sized + Clone {
 	type Semantics: Semantics + Sized;
 
 	// Max size of `small` terms. (TODO: Make language-dependent)
-	const SMALL_SIZE: usize = 12;
+	const SMALL_SIZE: usize;
 
 	// Max size of `large` terms. (TODO: Make language-dependent)
-	const LARGE_SIZE: usize = 18;
+	const LARGE_SIZE: usize;
 
 	fn context(&self) -> Context;
 

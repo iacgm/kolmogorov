@@ -6,7 +6,7 @@ use opaque::*;
 fn main() {
 	let lang = Opaque;
 
-	let examples: Vec<_> = (0..10).map(|n| (n, n * n + n)).collect();
+	let examples: Vec<_> = (0..10).map(|n| (n, n * n * n + n * n)).collect();
 
 	let lang_ctxt = lang.context();
 
@@ -36,7 +36,7 @@ fn main() {
 
 	let ty = ty!(N => N);
 
-	let iterations = 2500;
+	let iterations = 10000;
 
 	let metropolis_search = metropolis(&lang, &start, &ty, scorer, iterations);
 

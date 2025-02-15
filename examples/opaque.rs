@@ -8,6 +8,12 @@ pub struct Opaque;
 impl Language for Opaque {
 	type Semantics = OpaqueSemantics;
 
+	// Max size of `small` terms. (TODO: Make language-dependent)
+	const SMALL_SIZE: usize = 8;
+
+	// Max size of `large` terms. (TODO: Make language-dependent)
+	const LARGE_SIZE: usize = 12;
+
 	fn context(&self) -> Context {
 		use Term::*;
 		let plus = builtin!(
