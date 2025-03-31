@@ -2,7 +2,7 @@ use std::fmt::{Debug, Display};
 
 use super::*;
 
-#[derive(Hash, PartialEq, Eq, Clone, Copy)]
+#[derive(Hash, PartialEq, Eq, Clone, Copy, PartialOrd, Ord)]
 pub enum Identifier {
 	Name(&'static str),
 	Uuid(u128),
@@ -66,12 +66,26 @@ pub fn new_var_where(mut p: impl FnMut(Identifier) -> bool) -> Option<Identifier
 		.find(|&id| p(id))
 }
 
+pub fn uuid() -> Identifier {
+	// Technically unsafe in a multithreaded setting, but I'll be shocked if this isn't fine forever.
+
+	static mut COUNTER: u128 = 0;
+
+	let x;
+	unsafe {
+		x = COUNTER;
+		COUNTER += 1;
+	}
+
+	Identifier::Uuid(x)
+}
+
 impl Display for Identifier {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		use Identifier::*;
 		match self {
 			Name(s) => write!(f, "{}", s),
-			Uuid(u) => write!(f, "{}", u),
+			Uuid(u) => write!(f, "_{}", u),
 		}
 	}
 }
@@ -95,19 +109,7 @@ impl From<u128> for Identifier {
 }
 
 impl Identifier {
-	fn gen_uuid() -> Self {
-		static mut COUNTER: u128 = 0;
-
-		let x;
-		unsafe {
-			x = COUNTER;
-			COUNTER += 1;
-		}
-
-		Self::Uuid(x)
-	}
-
-	fn str(&self) -> &'static str {
+	pub fn str(&self) -> &'static str {
 		match self {
 			Self::Name(s) => s,
 			_ => unimplemented!(),

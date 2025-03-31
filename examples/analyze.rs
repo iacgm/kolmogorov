@@ -1,12 +1,12 @@
 use kolmogorov::*;
 
-mod contexts;
-use contexts::*;
+mod polynomials;
+use polynomials::*;
 
 fn main() {
-	let lang = Polynomials;
+	let lang = PolynomialLanguage;
 
-	let term = term!(plus(f)(plus(plus(f)(one))(one)));
+	let term = term!(plus(one)(one));
 
 	let analysis = lang.analyze(&term);
 
