@@ -7,7 +7,7 @@ use statrs::distribution::Discrete;
 // Probability of replacing a variable with another
 const REPLACE_VAR: f64 = 0.5;
 // Probability of replacing a small (non-variable) subterm with another of equal size
-const REPLACE_SMALL: f64 = 0.48;
+const REPLACE_SMALL: f64 = 0.46;
 // Probability of replacing a larger subterm with anohter, potentially of different size
 // This is much more computationally expensive and can erase a lot of progress, but also
 // allows us to exit local minima (we must calculate g(x'|x) & g(x|x'), involving a census
@@ -18,7 +18,8 @@ const REPLACE_LARGE: f64 = 1. - REPLACE_VAR - REPLACE_SMALL;
 // How often we print out progress
 const PRINT_FREQ: usize = 100;
 
-pub fn metropolis<F: FnMut(&Term) -> f64, L: Language>(
+// If F returns None, we stop immediately
+pub fn metropolis<F: FnMut(&Term) -> Option<f64>, L: Language>(
 	lang: &L,
 	start: &Term,
 	ty: &Type,
@@ -26,7 +27,9 @@ pub fn metropolis<F: FnMut(&Term) -> f64, L: Language>(
 	iterations: usize,
 ) -> Term {
 	let mut candidate = start.clone();
-	let mut score = scorer(start);
+	let Some(mut score) = scorer(start) else {
+		return start.clone();
+	};
 
 	let mut best_candidate = start.clone();
 	let mut best_score = 0.;
@@ -46,7 +49,9 @@ pub fn metropolis<F: FnMut(&Term) -> f64, L: Language>(
 			continue;
 		};
 
-		let proposal_score = scorer(&proposal);
+		let Some(proposal_score) = scorer(&proposal) else {
+			return proposal;
+		};
 
 		if proposal_score > best_score {
 			best_score = proposal_score;

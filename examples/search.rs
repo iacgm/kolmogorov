@@ -1,10 +1,10 @@
 use kolmogorov::*;
 
-mod opaque;
-use opaque::*;
+mod polynomials;
+use polynomials::*;
 
 fn main() {
-	let lang = Opaque;
+	let lang = PolynomialLanguage;
 	let ty = ty!(N => N);
 
 	for n in 1.. {

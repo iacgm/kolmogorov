@@ -14,7 +14,9 @@ fn main() {
 
 	let scorer = |t: &Term| {
 		use Term::*;
-		let mut num_correct = 10.;
+		let max_correct = examples.len() as f64;
+
+		let mut num_correct = max_correct;
 		for (x, y) in examples.iter().copied() {
 			let program = term! {
 				[t] [Num(x)]
@@ -29,7 +31,11 @@ fn main() {
 			}
 		}
 
-		(TUNING_PARAM * num_correct).exp()
+		if num_correct == max_correct {
+			return None;
+		}
+
+		Some((TUNING_PARAM * num_correct).exp())
 	};
 
 	let start = term!(n -> n);
