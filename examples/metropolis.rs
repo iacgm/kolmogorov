@@ -14,29 +14,29 @@ fn main() {
 
 	let scorer = |t: &Term| {
 		use Term::*;
-		let mut num_correct = 0;
+		let mut num_correct = 10.;
 		for (x, y) in examples.iter().copied() {
 			let program = term! {
 				[t] [Num(x)]
 			};
-			
+
 			let evaled = lang_ctxt.evaluate(&program);
-			
+
 			let output = evaled.int().unwrap();
 
-			if output == y {
-				num_correct += 1;
+			if output != y {
+				num_correct -= 1.;
 			}
 		}
 
-		(TUNING_PARAM * num_correct as f64).exp()
+		(TUNING_PARAM * num_correct).exp()
 	};
 
 	let start = term!(n -> n);
 
 	let ty = ty!(N => N);
 
-	let iterations = 10000;
+	let iterations = 50_000;
 
 	let metropolis_search = metropolis(&lang, &start, &ty, scorer, iterations);
 

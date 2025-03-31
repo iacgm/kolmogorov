@@ -24,8 +24,8 @@ impl Term {
 		match self {
 			Ref(r) => (**r).borrow().deep_clone(),
 			Num(n) => Num(*n),
-			Var(v) => Var(v),
-			Lam(v, b) => Lam(v, b.clone()),
+			Var(v) => Var(*v),
+			Lam(v, b) => Lam(*v, b.clone()),
 			App(l, r) => App(
 				(**l).borrow().deep_clone().into(),
 				(**r).borrow().deep_clone().into(),
@@ -39,16 +39,16 @@ impl Term {
 			Num(n) => Num(*n),
 			Lam(v, b) => {
 				if *v == var {
-					Lam(v, b.clone())
+					Lam(*v, b.clone())
 				} else {
-					Lam(v, b.instantiate_var(var, thunk).into())
+					Lam(*v, b.instantiate_var(var, thunk).into())
 				}
 			}
 			Var(v) => {
 				if *v == var {
 					Ref(thunk.clone())
 				} else {
-					Var(v)
+					Var(*v)
 				}
 			}
 			Ref(next) => {
@@ -65,11 +65,12 @@ impl Term {
 	// `self` is a pattern which generalizes term.
 	pub fn unify(&self, term: &Term) -> Option<Vec<Term>> {
 		fn unify_into(patt: &Term, term: &Term, out: &mut Vec<Term>) -> bool {
+			use Identifier::*;
 			use Term::*;
 			match (patt, term) {
 				(Ref(r), _) => unify_into(&r.borrow(), term, out),
 				(_, Ref(r)) => unify_into(patt, &r.borrow(), out),
-				(Var("_"), term) => {
+				(Var(Name("_")), term) => {
 					out.push(term.clone());
 					true
 				}

@@ -13,10 +13,10 @@ pub trait Language: Sized + Clone {
 	type Semantics: Semantics + Sized;
 
 	// Max size of `small` terms. (TODO: Make language-dependent)
-	const SMALL_SIZE: usize;
+	const SMALL_SIZE: usize = 5;
 
 	// Max size of `large` terms. (TODO: Make language-dependent)
-	const LARGE_SIZE: usize;
+	const LARGE_SIZE: usize = 10;
 
 	fn context(&self) -> Context;
 
@@ -29,8 +29,8 @@ pub trait Language: Sized + Clone {
 		use Term::*;
 		match term {
 			Num(n) => self.snum(*n),
-			Var(v) => self.svar(v),
-			Lam(i, b) => self.slam(i, self.analyze(b)),
+			Var(v) => self.svar(*v),
+			Lam(i, b) => self.slam(*i, self.analyze(b)),
 			App(l, r) => self.sapp(self.analyze(&l.borrow()), self.analyze(&r.borrow())),
 			Ref(r) => self.analyze(&r.borrow()),
 		}

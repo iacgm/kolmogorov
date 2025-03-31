@@ -35,7 +35,7 @@ impl TypeSub {
 				(Int, Int) => continue,
 				(Var(x), Var(y)) if x == y => continue,
 				(t, Var(v)) | (Var(v), t) => {
-					if contains(&subs, v, t) {
+					if contains(&subs, *v, t) {
 						return None;
 					}
 
@@ -44,7 +44,7 @@ impl TypeSub {
 					}
 
 					let Some(expected) = subs.get(v) else {
-						subs.insert(v, t);
+						subs.insert(*v, t);
 						continue;
 					};
 

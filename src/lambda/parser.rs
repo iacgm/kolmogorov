@@ -1,10 +1,10 @@
 #[macro_export]
 macro_rules! term {
 	(_) => {
-		$crate::Term::Var("_")
+		$crate::Term::Var($crate::Identifier::Name("_"))
 	};
 	($x: ident) => {
-		$crate::Term::Var(stringify!($x))
+		$crate::Term::Var($crate::Identifier::Name(stringify!($x)))
 	};
 	([$x: expr]) => {
 		$x.clone()
@@ -13,10 +13,10 @@ macro_rules! term {
 		$crate::Term::Num($x)
 	};
 	($x:ident -> $($r:tt)+) => {
-		$crate::Term::Lam(stringify!($x), $crate::term!($($r)+).into())
+		$crate::Term::Lam($crate::Identifier::Name(stringify!($x)), $crate::term!($($r)+).into())
 	};
 	($x:ident $($xs:ident)+ -> $($r:tt)+) => {
-		$crate::Term::Lam(stringify!($x), $crate::term!($($xs)* -> $($r)+).into())
+		$crate::Term::Lam($crate::Identifier::Name(stringify!($x)), $crate::term!($($xs)* -> $($r)+).into())
 	};
 	(($($r:tt)+)) => {
 		$crate::term!($($r)+)
@@ -78,7 +78,7 @@ macro_rules! context {
 	{$($def:ident),*} => {{
 		Context::new(
 			&[$(
-				(stringify!($def), $def.clone())
+				($crate::Identifier::Name(stringify!($def)), $def.clone())
 			),*],
 		)
 	}};

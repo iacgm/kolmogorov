@@ -7,7 +7,7 @@ use statrs::distribution::Discrete;
 // Probability of replacing a variable with another
 const REPLACE_VAR: f64 = 0.5;
 // Probability of replacing a small (non-variable) subterm with another of equal size
-const REPLACE_SMALL: f64 = 0.45;
+const REPLACE_SMALL: f64 = 0.48;
 // Probability of replacing a larger subterm with anohter, potentially of different size
 // This is much more computationally expensive and can erase a lot of progress, but also
 // allows us to exit local minima (we must calculate g(x'|x) & g(x|x'), involving a census
@@ -184,7 +184,7 @@ pub fn replace_subnode(dest: &Term, node_id: usize, src: Term) -> Term {
 		use Term::*;
 		match dest {
 			Ref(r) => helper(counter, &(**r).borrow(), node_id, src),
-			Lam(v, b) => Lam(v, helper(counter, b, node_id, src).into()),
+			Lam(v, b) => Lam(*v, helper(counter, b, node_id, src).into()),
 			App(l, r) => {
 				let l = &(**l).borrow().clone();
 				let l = helper(counter, l, node_id, src.clone());
@@ -290,7 +290,7 @@ fn annotate_term(term: &Term, ctxt: &Context, ty: &Type) -> Metadata {
 						ty: (**v_ty).clone(),
 						decls: decls.clone(),
 					}
-				} else if let Some(builtin) = ctxt.get(v) {
+				} else if let Some(builtin) = ctxt.get(*v) {
 					Annotation {
 						size: 1,
 						ty: (*builtin.ty).clone(),
@@ -310,7 +310,7 @@ fn annotate_term(term: &Term, ctxt: &Context, ty: &Type) -> Metadata {
 				let decls = decls.clone();
 
 				let mut body_decls = decls.clone();
-				body_decls.push((v, arg.clone()));
+				body_decls.push((*v, arg.clone()));
 
 				annotate(b, ctxt, Some(ret.as_ref()), map, &body_decls);
 

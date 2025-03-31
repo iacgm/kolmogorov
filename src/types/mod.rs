@@ -51,7 +51,7 @@ impl Type {
 			match ty {
 				Int => (),
 				Var(v) => {
-					if let Some(new) = map.get(v) {
+					if let Some(&new) = map.get(v) {
 						*ty = Var(new);
 					}
 				}

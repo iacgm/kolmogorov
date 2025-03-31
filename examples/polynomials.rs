@@ -160,7 +160,7 @@ impl PolySem {
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 // None indicates an anonymous variable (i.e., one removed by eta-reduction)
-struct PolySem(Vec<Option<Identifier>>, Sum);
+struct PolySem(Vec<Identifier>, Sum);
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 struct Sum(i32, Vec<Product>);
@@ -172,8 +172,6 @@ impl Semantics for PolySem {}
 
 impl Display for PolySem {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		use PolySem::*;
-
 		match self {
 			App(sems) => {
 				write!(f, "{}", &sems[0])?;

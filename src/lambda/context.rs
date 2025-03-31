@@ -20,7 +20,7 @@ impl Context {
 
 	pub fn insert(&mut self, defs: &[(Identifier, BuiltIn)]) {
 		for (ident, def) in defs {
-			self.defs.insert(ident, def.clone());
+			self.defs.insert(*ident, def.clone());
 		}
 	}
 
@@ -29,14 +29,14 @@ impl Context {
 	}
 
 	pub fn get(&self, ident: Identifier) -> Option<&BuiltIn> {
-		self.defs.get(ident)
+		self.defs.get(&ident)
 	}
 
 	pub fn vgen(&self) -> VarGen {
 		let mut vgen = VarGen::default();
 
 		for var in self.defs.keys() {
-			vgen.retire(var);
+			vgen.retire(*var);
 		}
 
 		vgen
@@ -82,7 +82,7 @@ impl Context {
 			Var(v) => {
 				if let Some(BuiltIn {
 					func, n_args: 0, ..
-				}) = self.get(v)
+				}) = self.get(*v)
 				{
 					*term = func(&mut []).unwrap();
 					drop(borrow);
@@ -107,7 +107,7 @@ impl Context {
 		match root {
 			Ref(thunk) => self.collapse_spine(&mut thunk.borrow_mut(), depth),
 			Num(_) | Lam(_, _) => Whnf,
-			Var(v) => match self.get(v) {
+			Var(v) => match self.get(*v) {
 				Some(BuiltIn {
 					func, n_args: 0, ..
 				}) => {
@@ -190,7 +190,7 @@ impl Context {
 				}
 				Lam(v, b) => {
 					let mut tyv = Type::Var(vgen.cap_var());
-					vtys.insert(v, tyv.clone());
+					vtys.insert(*v, tyv.clone());
 
 					let body = core(b, vgen, tsub, vtys);
 
@@ -203,7 +203,7 @@ impl Context {
 						t.clone()
 					} else {
 						let tyv = Type::Var(vgen.cap_var());
-						vtys.insert(v, tyv.clone());
+						vtys.insert(*v, tyv.clone());
 						tyv
 					}
 				}
@@ -214,7 +214,7 @@ impl Context {
 		let mut vtys = VarsTys::default();
 
 		for (v, t) in &self.defs {
-			vtys.insert(v, (*t.ty).clone());
+			vtys.insert(*v, (*t.ty).clone());
 		}
 
 		core(
