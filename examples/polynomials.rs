@@ -109,9 +109,6 @@ impl PolySem {
 	}
 
 	fn apply_to_sum(self, sum: Sum) -> Self {
-//		println!(">> {}", self);
-//		println!("&& {}", sum);
-
 		let PolySem(mut args, body) = self;
 		let ident = args.pop().expect("Did not expect argument.");
 		let Sum(shift, ps) = body;
@@ -136,9 +133,7 @@ impl PolySem {
 			output = output.add(&addends);
 		}
 
-//		println!(" = {}", output);
 		output.normalize();
-//		println!("|= {}", output);
 
 		PolySem(args, output)
 	}
