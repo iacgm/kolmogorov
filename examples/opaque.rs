@@ -1,5 +1,3 @@
-use std::fmt::Display;
-
 use kolmogorov::*;
 
 #[derive(Clone)]
@@ -53,17 +51,6 @@ impl Language for Opaque {
 
 	fn slam(&self, _ident: Identifier, _body: Analysis<Self>) -> Analysis<Self> {
 		Analysis::Unique
-	}
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct OpaqueSemantics;
-
-impl Semantics for OpaqueSemantics {}
-
-impl Display for OpaqueSemantics {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		write!(f, "{:?}", self)
 	}
 }
 

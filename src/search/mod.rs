@@ -25,7 +25,11 @@ pub fn search<'a, L: Language>(
 ) -> Enumerator<'a, L> {
 	let ctxt = lang.context();
 
-	let vgen = ctxt.vgen();
+	let mut vgen = ctxt.vgen();
+
+	for (var, _) in &vars {
+		vgen.retire(*var);
+	}
 
 	Enumerator {
 		search_ctxt: SearchContext {

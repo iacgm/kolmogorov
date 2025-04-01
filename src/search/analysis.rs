@@ -20,10 +20,21 @@ pub trait Language: Sized + Clone {
 
 	fn context(&self) -> Context;
 
-	fn snum(&self, _: i32) -> Analysis<Self>;
-	fn svar(&self, _: Identifier) -> Analysis<Self>;
-	fn slam(&self, ident: Identifier, body: Analysis<Self>) -> Analysis<Self>;
-	fn sapp(&self, fun: Analysis<Self>, arg: Analysis<Self>) -> Analysis<Self>;
+	fn snum(&self, _: i32) -> Analysis<Self> {
+		Analysis::Unique
+	}
+
+	fn svar(&self, _: Identifier) -> Analysis<Self> {
+		Analysis::Unique
+	}
+
+	fn slam(&self, _ident: Identifier, _body: Analysis<Self>) -> Analysis<Self> {
+		Analysis::Unique
+	}
+
+	fn sapp(&self, _fun: Analysis<Self>, _arg: Analysis<Self>) -> Analysis<Self> {
+		Analysis::Unique
+	}
 
 	fn analyze(&self, term: &Term) -> Analysis<Self> {
 		use Term::*;

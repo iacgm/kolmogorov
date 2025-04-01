@@ -1,6 +1,6 @@
 use kolmogorov::*;
 
-fn fib_ctx() -> (Context, Option<Analyzer>) {
+fn fib_ctx() -> Context {
 	use Term::*;
 
 	let lte = builtin!(
@@ -72,7 +72,7 @@ fn main() {
 					}
 				}
 			};
-			let name: Identifier = format!("prevs_{}", n).leak();
+			let name: Identifier = format!("prevs_{}", n).leak().into();
 			(name, def)
 		})
 		.collect();

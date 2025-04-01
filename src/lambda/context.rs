@@ -72,7 +72,6 @@ impl Context {
 		Rc::unwrap_or_clone(thunk).into_inner()
 	}
 
-	// True if any work done
 	pub fn evaluate_thunk(&self, thunk: &mut Thunk) {
 		use Term::*;
 		let mut borrow = (**thunk).borrow_mut();
