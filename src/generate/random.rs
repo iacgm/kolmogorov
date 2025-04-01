@@ -7,7 +7,7 @@ use statrs::distribution::Discrete;
 // Probability of replacing a variable with another
 const REPLACE_VAR: f64 = 0.5;
 // Probability of replacing a small (non-variable) subterm with another of equal size
-const REPLACE_SMALL: f64 = 0.46;
+const REPLACE_SMALL: f64 = 0.40;
 // Probability of replacing a larger subterm with anohter, potentially of different size
 // This is much more computationally expensive and can erase a lot of progress, but also
 // allows us to exit local minima (we must calculate g(x'|x) & g(x|x'), involving a census
@@ -34,6 +34,8 @@ pub fn metropolis<F: FnMut(&Term) -> Option<f64>, L: Language>(
 	let mut best_candidate = start.clone();
 	let mut best_score = 0.;
 
+	let mut cache = SizeCache::default();
+
 	for i in 0..iterations {
 		if i % PRINT_FREQ == 0 {
 			println!(
@@ -45,7 +47,7 @@ pub fn metropolis<F: FnMut(&Term) -> Option<f64>, L: Language>(
 		}
 
 		// g_ratio = g(x|x') / g(x'|x)
-		let Some((proposal, g_ratio)) = mutate(lang, &candidate, ty) else {
+		let Some((proposal, g_ratio)) = mutate(lang, &candidate, ty, &mut cache) else {
 			continue;
 		};
 
@@ -72,7 +74,12 @@ pub fn metropolis<F: FnMut(&Term) -> Option<f64>, L: Language>(
 }
 
 // Mutates a &Term. Also returns g(x|x') / g(x'|x) [where x' is the proposal]
-pub fn mutate<L: Language>(lang: &L, term: &Term, ty: &Type) -> Option<(Term, f64)> {
+fn mutate<L: Language>(
+	lang: &L,
+	term: &Term,
+	ty: &Type,
+	cache: &mut SizeCache<L>,
+) -> Option<(Term, f64)> {
 	let ctxt = lang.context();
 
 	use MutationTy::*;
@@ -80,12 +87,8 @@ pub fn mutate<L: Language>(lang: &L, term: &Term, ty: &Type) -> Option<(Term, f6
 		HVar => {
 			let (replacement_node, annotation, _) = random_subnode(&ctxt, term, ty, 1, 1);
 
-			let (_, proposal) = reservoir_sample(search(
-				lang,
-				annotation.decls,
-				&annotation.ty,
-				annotation.size,
-			));
+			let (_, proposal) =
+				cache.sample(lang, annotation.decls, &annotation.ty, annotation.size);
 
 			let (new_term, _analysis) = proposal.unwrap();
 
@@ -97,12 +100,8 @@ pub fn mutate<L: Language>(lang: &L, term: &Term, ty: &Type) -> Option<(Term, f6
 			let (replacement_node, annotation, _) =
 				random_subnode(&ctxt, term, ty, 2, L::SMALL_SIZE);
 
-			let (_, replacement) = reservoir_sample(search(
-				lang,
-				annotation.decls,
-				&annotation.ty,
-				annotation.size,
-			));
+			let (_, replacement) =
+				cache.sample(lang, annotation.decls, &annotation.ty, annotation.size);
 
 			let (new_term, _analysis) = replacement.unwrap();
 
@@ -127,12 +126,12 @@ pub fn mutate<L: Language>(lang: &L, term: &Term, ty: &Type) -> Option<(Term, f6
 			let replacement_size: u64 = size_distr.sample(&mut rand::thread_rng());
 			let replacement_size = replacement_size as usize;
 
-			let (new_count, replacement) = reservoir_sample(search(
+			let (new_count, replacement) = cache.sample(
 				lang,
 				annotation.decls.clone(),
 				&annotation.ty,
 				replacement_size,
-			));
+			);
 
 			let (replacement, _analysis) = replacement?;
 
@@ -142,7 +141,8 @@ pub fn mutate<L: Language>(lang: &L, term: &Term, ty: &Type) -> Option<(Term, f6
 				return None;
 			}
 
-			let old_count = search(lang, annotation.decls, &annotation.ty, annotation.size).count();
+			let old_count =
+				cache.query_count(lang, annotation.decls, &annotation.ty, annotation.size);
 
 			// g1 = g(x' | x)
 			let g1 = g::<L>(subnode_count, replacement_size, annotation.size, new_count);
@@ -371,6 +371,126 @@ impl MutationTy {
 			Self::Small
 		} else {
 			Self::Large
+		}
+	}
+}
+
+type CtxtCache<L> = HashMap<(Type, usize), CacheEntry<L>>;
+
+struct SizeCache<L: Language> {
+	map: HashMap<VarsVec, CtxtCache<L>>,
+}
+
+enum CacheEntry<L: Language> {
+	Explicit(Vec<(Term, Analysis<L>)>),
+	Count(usize),
+}
+
+impl<L: Language> SizeCache<L> {
+	const MAX_IN_MEM: usize = 16;
+
+	pub fn sample(
+		&mut self,
+		lang: &L,
+		mut decls: VarsVec,
+		ty: &Type,
+		size: usize,
+	) -> (usize, Option<(Term, Analysis<L>)>) {
+		use CacheEntry::*;
+
+		decls.sort();
+		let query = (ty.clone(), size);
+
+		let map = self.map.entry(decls.clone()).or_default();
+		if let Some(cache_entry) = map.get(&query) {
+			match cache_entry {
+				Count(0) => {
+					return (0, None);
+				}
+				Explicit(explicit) => {
+					let len = explicit.len();
+					let id = (random() * len as f64) as usize;
+
+					return (explicit.len(), Some(explicit[id].clone()));
+				}
+				_ => (),
+			}
+		}
+
+		let mut explicit = Vec::with_capacity(Self::MAX_IN_MEM);
+
+		let mut search = search(lang, decls.clone(), ty, size);
+
+		while explicit.len() < Self::MAX_IN_MEM {
+			if let Some(next) = search.next() {
+				explicit.push(next);
+			} else if !explicit.is_empty() {
+				let len = explicit.len();
+				let id = (random() * len as f64) as usize;
+
+				map.entry(query)
+					.or_insert_with(|| Explicit(explicit.clone()));
+
+				return (len, Some(explicit.swap_remove(id)));
+			} else {
+				map.entry(query).or_insert(Count(0));
+				return (0, None);
+			}
+		}
+
+		let (rest_count, selected) = reservoir_sample(search);
+
+		if selected.is_none() {
+			let len = explicit.len();
+			let id = (random() * len as f64) as usize;
+
+			map.entry(query)
+				.or_insert_with(|| Explicit(explicit.clone()));
+
+			return (len, Some(explicit.swap_remove(id)));
+		}
+
+		let total_count = Self::MAX_IN_MEM + rest_count;
+		let prob = rest_count as f64 / total_count as f64;
+
+		map.entry(query).or_insert(Count(total_count));
+
+		if with_probability(prob) {
+			let len = explicit.len();
+			let id = (random() * len as f64) as usize;
+			return (total_count, Some(explicit.swap_remove(id)));
+		}
+
+		(total_count, selected)
+	}
+
+	pub fn query_count(&mut self, lang: &L, mut decls: VarsVec, ty: &Type, size: usize) -> usize {
+		use CacheEntry::*;
+		let query = (ty.clone(), size);
+
+		decls.sort();
+
+		let map = self.map.entry(decls.clone()).or_default();
+
+		if let Some(entry) = map.get(&query) {
+			return match entry {
+				Count(count) => *count,
+				Explicit(v) => v.len(),
+			};
+		}
+
+		let count = search(lang, decls, ty, size).count();
+
+		map.insert(query, Count(count));
+
+		count
+	}
+}
+
+impl<L: Language> Default for SizeCache<L> {
+	fn default() -> Self {
+		Self {
+			map: Default::default(),
 		}
 	}
 }
