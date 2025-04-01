@@ -1,10 +1,11 @@
+use statrs::distribution::{Continuous, Normal};
+
 use kolmogorov::{random::metropolis, *};
 
 mod polynomials;
 use polynomials::*;
 
 fn main() {
-
 	let lang = PolynomialLanguage;
 
 	let num_examples = 10;
@@ -15,7 +16,13 @@ fn main() {
 
 	let lang_ctxt = lang.context();
 
-	const TUNING_PARAM: f64 = 0.5;
+	let avg_size = 30f64;
+	let size_std = 10f64;
+
+	let normal = Normal::new(avg_size, size_std).unwrap();
+
+	const SCORE_TUNING_PARAM: f64 = 0.5;
+	const SIZE_TUNING_PARAM: f64 = 0.25;
 
 	let int_scorer = |t: &Term| {
 		use Term::*;
@@ -44,7 +51,10 @@ fn main() {
 			return None;
 		}
 
-		Some((TUNING_PARAM * num_correct as f64).exp())
+		let prob_score = (SCORE_TUNING_PARAM * num_correct as f64).exp();
+		let prob_size = SIZE_TUNING_PARAM * normal.pdf(term.size() as f64);
+
+		Some(prob_score * prob_size)
 	};
 
 	let start = term!(n -> n);
