@@ -18,8 +18,8 @@ use Analysis::*;
 impl Language for PolynomialLanguage {
 	type Semantics = PolySem;
 
-	const SMALL_SIZE: usize = 5;
-	const LARGE_SIZE: usize = 8;
+	const SMALL_SIZE: usize = 10;
+	const LARGE_SIZE: usize = 20;
 
 	fn context(&self) -> kolmogorov::Context {
 		use Term::*;
@@ -109,14 +109,14 @@ impl PolySem {
 	}
 
 	fn apply_to_sum(self, sum: Sum) -> Self {
+//		println!(">> {}", self);
+//		println!("&& {}", sum);
 
 		let PolySem(mut args, body) = self;
 		let ident = args.pop().expect("Did not expect argument.");
 		let Sum(shift, ps) = body;
 
-		let Sum(sum_shift, _) = &sum;
-
-		let mut output = Sum(shift * sum_shift, vec![]);
+		let mut output = Sum(shift, vec![]);
 
 		for Product(s1, vs1) in ps {
 			let mut prod_terms = Product(s1, vec![]);
@@ -136,7 +136,9 @@ impl PolySem {
 			output = output.add(&addends);
 		}
 
+//		println!(" = {}", output);
 		output.normalize();
+//		println!("|= {}", output);
 
 		PolySem(args, output)
 	}
