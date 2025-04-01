@@ -1,12 +1,12 @@
 use kolmogorov::{random::metropolis, *};
 
-mod opaque;
-use opaque::*;
+mod polynomials;
+use polynomials::*;
 
 fn main() {
-	let lang = Opaque;
+	let lang = PolynomialLanguage;
 
-	let examples: Vec<_> = (0..10).map(|n| (n, n * n * n + n * n)).collect();
+	let examples: Vec<_> = (0..10).map(|n| (n, 4 * n * n * n + n * n)).collect();
 
 	let lang_ctxt = lang.context();
 
@@ -34,11 +34,11 @@ fn main() {
 		if max_correct - num_correct < 1. {
 			return None;
 		}
-		
+
 		Some((TUNING_PARAM * num_correct).exp())
 	};
 
-	let start = term!(n -> n);
+	let start = term!(n -> plus(plus(plus(plus(n)n)n)n)n);
 
 	let ty = ty!(N => N);
 
@@ -46,5 +46,6 @@ fn main() {
 
 	let metropolis_search = metropolis(&lang, &start, &ty, scorer, iterations);
 
-	println!("Best Found: {}", metropolis_search);
+	println!("Best Found: {}", &metropolis_search);
+	println!("Semantics:  {}", lang.analyze(&metropolis_search));
 }

@@ -1,6 +1,5 @@
 use super::*;
 
-use rand::{thread_rng, Rng};
 use rustc_hash::FxHashMap as HashMap;
 use statrs::distribution::Discrete;
 
@@ -120,6 +119,10 @@ fn mutate<L: Language>(
 			let (replacement_node, annotation, subnode_count) =
 				random_subnode(&ctxt, term, ty, 2, L::LARGE_SIZE);
 
+			if subnode_count == 0 {
+				return None;
+			}
+
 			let ratio = annotation.size as f64 / L::LARGE_SIZE as f64;
 
 			let size_distr = Binomial::new(ratio, L::LARGE_SIZE as u64).ok()?;
@@ -148,6 +151,11 @@ fn mutate<L: Language>(
 			let g1 = g::<L>(subnode_count, replacement_size, annotation.size, new_count);
 
 			let (_, _, subnode_count) = random_subnode(&ctxt, &proposal, ty, 2, L::LARGE_SIZE);
+
+			if subnode_count == 0 {
+				return None;
+			}
+
 			//g2 = g(x | x')
 			let g2 = g::<L>(subnode_count, annotation.size, replacement_size, old_count);
 
@@ -207,7 +215,7 @@ pub fn replace_subnode(dest: &Term, node_id: usize, src: Term) -> Term {
 // Reservoir sampling, again.
 // We return the index of the subnode (using pre-order numbering) & its size
 // Returns (node_id, annotation, small_node_count)
-fn random_subnode(
+pub fn random_subnode(
 	ctxt: &Context,
 	term: &Term,
 	ty: &Type,
@@ -217,20 +225,22 @@ fn random_subnode(
 	let mut selected_id: usize = 0;
 	let mut stack = vec![(term.clone(), term as *const Term)];
 	let mut counter = 1;
+	let mut small_counter = 0;
 
 	let metadata = annotate_term(term, ctxt, ty);
 
 	let ptr = term as *const Term;
 	let mut annotation = metadata.get(&ptr).unwrap();
 
-	let mut rng = thread_rng();
-
 	while let Some((next, ptr)) = stack.pop() {
 		let size = next.size();
 
-		if (min_size..=max_size).contains(&size) && rng.gen_range(0..counter) == 0 {
-			selected_id = counter;
-			annotation = metadata.get(&ptr).unwrap();
+		if (min_size..=max_size).contains(&size) {
+			small_counter += 1;
+			if with_probability(1. / small_counter as f64) {
+				selected_id = counter;
+				annotation = metadata.get(&ptr).unwrap();
+			}
 		}
 
 		use Term::*;
@@ -247,11 +257,11 @@ fn random_subnode(
 		counter += 1;
 	}
 
-	(selected_id, annotation.clone(), counter - 1)
+	(selected_id, annotation.clone(), small_counter)
 }
 
 #[derive(Clone, Debug)]
-struct Annotation {
+pub struct Annotation {
 	size: usize,
 	ty: Type,
 	decls: VarsVec, // Variables in scope
@@ -387,7 +397,7 @@ enum CacheEntry<L: Language> {
 }
 
 impl<L: Language> SizeCache<L> {
-	const MAX_IN_MEM: usize = 16;
+	const MAX_IN_MEM: usize = 32;
 
 	pub fn sample(
 		&mut self,

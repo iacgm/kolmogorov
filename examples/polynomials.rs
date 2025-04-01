@@ -18,8 +18,8 @@ use Analysis::*;
 impl Language for PolynomialLanguage {
 	type Semantics = PolySem;
 
-	const SMALL_SIZE: usize = 8;
-	const LARGE_SIZE: usize = 10;
+	const SMALL_SIZE: usize = 5;
+	const LARGE_SIZE: usize = 8;
 
 	fn context(&self) -> kolmogorov::Context {
 		use Term::*;
