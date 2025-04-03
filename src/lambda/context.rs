@@ -128,6 +128,8 @@ impl Context {
 						args.push(r.clone());
 
 						if argc == args.len() {
+							args.reverse();
+
 							for arg in &mut args[..] {
 								self.evaluate_thunk(arg);
 							}

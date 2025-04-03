@@ -43,7 +43,7 @@ fn main() {
 	const SCORE_TUNING_PARAM: f64 = 0.5;
 	const SIZE_TUNING_PARAM: f64 = 1.0;
 
-	let avg_size = 10f64;
+	let avg_size = 15f64;
 	let size_std = 5f64;
 
 	let normal = Normal::new(avg_size, size_std).unwrap();
@@ -85,11 +85,11 @@ fn main() {
 		Some(prob_score * prob_size)
 	};
 
-	let start = term!(f n -> n);
+	let start = term!(f n -> plus (f (minus n one)) (f (minus n two)));
 
 	let ty = ty!((N => N) => N => N);
 
-	let iterations = 50_000;
+	let iterations = 150_000;
 
 	let metropolis_search = metropolis(&lang, &start, &ty, scorer, iterations);
 

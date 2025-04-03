@@ -11,10 +11,10 @@ impl Language for FibLang {
 
 		let lte = builtin!(
 			N => N => N => N => N
-			|a, b, c, d| => if a.int()? <= b.int()? {
-				c.clone()
+			|a, b| => if a.int()? <= b.int()? {
+				term!(a b -> a)
 			} else {
-				d.clone()
+				term!(a b -> b)
 			}
 		);
 
