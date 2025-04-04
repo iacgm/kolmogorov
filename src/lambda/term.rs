@@ -62,39 +62,6 @@ impl Term {
 		}
 	}
 
-	// `self` is a pattern which generalizes term.
-	pub fn unify(&self, term: &Term) -> Option<Vec<Term>> {
-		fn unify_into(patt: &Term, term: &Term, out: &mut Vec<Term>) -> bool {
-			use Identifier::*;
-			use Term::*;
-			match (patt, term) {
-				(Ref(r), _) => unify_into(&r.borrow(), term, out),
-				(_, Ref(r)) => unify_into(patt, &r.borrow(), out),
-				(Var(Name("_")), term) => {
-					out.push(term.clone());
-					true
-				}
-				(Var(a), Var(b)) => a == b,
-				(Num(a), Num(b)) => a == b,
-				(App(pl, pr), App(tl, tr)) => {
-					let pl = &pl.borrow();
-					let tl = &tl.borrow();
-					let pr = &pr.borrow();
-					let tr = &tr.borrow();
-					unify_into(pl, tl, out) && unify_into(pr, tr, out)
-				}
-				_ => false,
-			}
-		}
-
-		let mut vec = vec![];
-		if unify_into(self, term, &mut vec) {
-			Some(vec)
-		} else {
-			None
-		}
-	}
-
 	pub fn size(&self) -> usize {
 		use Term::*;
 		match self {
@@ -142,6 +109,10 @@ impl Term {
 impl PartialEq for Term {
 	fn eq(&self, other: &Self) -> bool {
 		use Term::*;
+		if std::ptr::eq(self, other) {
+			return true;
+		}
+
 		match (self, other) {
 			(Ref(r), t) | (t, Ref(r)) => &*(**r).borrow() == t,
 			(Num(a), Num(b)) => a == b,
@@ -155,31 +126,6 @@ impl PartialEq for Term {
 				**ll == **rl && **lr == **rr
 			}
 			_ => false,
-		}
-	}
-}
-
-impl std::hash::Hash for Term {
-	fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-		use Term::*;
-		if let Ref(r) = self {
-			return (**r).borrow().hash(state);
-		} else {
-			std::mem::discriminant(self).hash(state);
-		}
-
-		match self {
-			Ref(_) => unreachable!(),
-			Num(n) => n.hash(state),
-			Var(v) => v.hash(state),
-			Lam(v, b) => {
-				v.hash(state);
-				b.hash(state);
-			}
-			App(l, r) => {
-				l.borrow().hash(state);
-				r.borrow().hash(state);
-			}
 		}
 	}
 }

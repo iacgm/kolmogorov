@@ -95,7 +95,7 @@ fn main() {
 
 	println!("Best Found: {}", &metropolis_search);
 	println!("Semantics:  {}", lang.analyze(&metropolis_search));
-
+	println!("Size: {}", metropolis_search.size());
 	println!(
 		"Score: {:?} (or {:?} correct)",
 		scorer(&metropolis_search),

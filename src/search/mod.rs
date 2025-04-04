@@ -104,11 +104,9 @@ impl<'a, L: Language> SearchContext<'a, L> {
 }
 
 impl<'a, L: Language> Iterator for Enumerator<'a, L> {
-	type Item = (Term, Analysis<L>);
+	type Item = (ImmutableTerm, Analysis<L>);
 
 	fn next(&mut self) -> Option<Self::Item> {
-		self.root
-			.next(&mut self.search_ctxt)
-			.map(|(t, a)| (t.deep_clone(), a))
+		self.root.next(&mut self.search_ctxt)
 	}
 }

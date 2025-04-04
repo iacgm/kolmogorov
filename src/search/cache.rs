@@ -5,9 +5,9 @@ use rustc_hash::FxHashMap as HashMap;
 const CACHE_SIZE: usize = 8;
 
 type Search = (Rc<Type>, usize);
-type Analyzed<L> = (Term, Analysis<L>);
+type Analyzed<L> = (ImmutableTerm, Analysis<L>);
 type PathDict<L> = HashMap<Search, SearchResult<L>>;
-type SemanticDict<L> = HashMap<<L as Language>::Semantics, (Term, usize)>;
+type SemanticDict<L> = HashMap<<L as Language>::Semantics, (ImmutableTerm, usize)>;
 
 #[derive(Debug, Default, Clone)]
 pub enum SearchResult<L: Language> {
@@ -112,9 +112,9 @@ impl<L: Language> Cache<L> {
 		targ: &Rc<Type>,
 		size: usize,
 		node: Option<&Node<L>>,
-		term: Term,
+		term: ImmutableTerm,
 		analysis: Analysis<L>,
-	) -> Option<Term> {
+	) -> Option<ImmutableTerm> {
 		use Analysis::*;
 		match &analysis {
 			Malformed => return None,
@@ -192,7 +192,7 @@ impl<L: Language> SearchResult<L> {
 	}
 
 	//Add to space
-	pub fn log(&mut self, node: Option<&Node<L>>, term: &Term, analysis: Analysis<L>) {
+	pub fn log(&mut self, node: Option<&Node<L>>, term: &ImmutableTerm, analysis: Analysis<L>) {
 		match self {
 			Unknown if CACHE_SIZE != 0 => {
 				*self = Inhabited {

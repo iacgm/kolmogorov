@@ -52,18 +52,20 @@ fn main() {
 		}
 
 		let prob_score = (SCORE_TUNING_PARAM * num_correct as f64).exp();
-		let prob_size = SIZE_TUNING_PARAM * normal.pdf(term.size() as f64);
+		let prob_size = 1.;//SIZE_TUNING_PARAM * normal.pdf(term.size() as f64);
 
 		Some(prob_score * prob_size)
 	};
 
-	let start = term!(n -> n);
+	let start = term!(n -> plus n n);
 
 	let ty = ty!(N => N);
 
 	let iterations = 50_000;
 
-	let metropolis_search = metropolis(&lang, &start, &ty, scorer, iterations);
+	let s = std::time::Instant::now();
+	let (iters, metropolis_search) = metropolis(&lang, &start, &ty, scorer, iterations);
+	let e = std::time::Instant::now();
 
 	println!("Best Found: {}", &metropolis_search);
 	println!("Semantics:  {}", lang.analyze(&metropolis_search));
@@ -73,4 +75,6 @@ fn main() {
 		scorer(&metropolis_search),
 		int_scorer(&metropolis_search),
 	);
+
+	println!("Time per iter: {}", e.duration_since(s).as_secs_f32() / iters as f32);
 }

@@ -2,6 +2,7 @@ use super::*;
 
 use rustc_hash::FxHashMap as HashMap;
 use statrs::distribution::Discrete;
+use std::rc::Rc;
 
 // Probability of replacing a variable with another
 const REPLACE_VAR: f64 = 0.5;
@@ -24,10 +25,16 @@ pub fn metropolis<F: FnMut(&Term) -> Option<f64>, L: Language>(
 	ty: &Type,
 	mut scorer: F,
 	iterations: usize,
-) -> Term {
-	let mut candidate = start.clone();
+) -> (usize, Term) {
+	let ctxt = lang.context();
+
+	let mut i = 0;
+
+	let mut candidate = ImmutableTerm::from(start);
+	let mut candidate_metadata = annotate(&ctxt, &start.into(), ty, &vec![]);
+
 	let Some(mut score) = scorer(start) else {
-		return start.clone();
+		return (i, start.clone());
 	};
 
 	let mut best_candidate = start.clone();
@@ -35,7 +42,9 @@ pub fn metropolis<F: FnMut(&Term) -> Option<f64>, L: Language>(
 
 	let mut cache = SizeCache::default();
 
-	for i in 0..iterations {
+	while i <= iterations {
+		i += 1;
+
 		if i % PRINT_FREQ == 0 {
 			println!(
 				"Metropolis progress: {}/{}. Size {}",
@@ -45,121 +54,114 @@ pub fn metropolis<F: FnMut(&Term) -> Option<f64>, L: Language>(
 			);
 		}
 
+		let mut proposal = candidate.clone();
+		let mut metadata = candidate_metadata.clone();
+
 		// g_ratio = g(x|x') / g(x'|x)
-		let Some((proposal, g_ratio)) = mutate(lang, &candidate, ty, &mut cache) else {
+		let Some(g_ratio) = mutate(lang, &ctxt, &mut proposal, &mut metadata, &mut cache) else {
 			continue;
 		};
 
-		let Some(proposal_score) = scorer(&proposal) else {
-			return proposal;
+		let proposal_term = proposal.term();
+		let Some(proposal_score) = scorer(&proposal_term) else {
+			return (i, proposal_term);
 		};
 
 		if proposal_score > best_score {
 			best_score = proposal_score;
-			best_candidate = proposal.clone();
+			best_candidate = proposal_term;
 		}
 
 		let score_ratio = proposal_score / score;
 
-		let acceptance_prob = score_ratio * g_ratio;
+		let acceptance_prob = dbg!(score_ratio * g_ratio);
 
-		if with_probability(acceptance_prob) {
+		if dbg!(with_probability(acceptance_prob)) {
 			candidate = proposal;
+			candidate_metadata = metadata;
 			score = proposal_score;
 		}
 	}
 
-	best_candidate
+	(i, best_candidate)
 }
 
 // Mutates a &Term. Also returns g(x|x') / g(x'|x) [where x' is the proposal]
 fn mutate<L: Language>(
 	lang: &L,
-	term: &Term,
-	ty: &Type,
+	ctxt: &Context,
+	term: &mut ImmutableTerm,
+	meta: &mut Metadata,
 	cache: &mut SizeCache<L>,
-) -> Option<(Term, f64)> {
-	let ctxt = lang.context();
-
+) -> Option<f64> {
+	println!();
+	println!("orig={}", term);
 	use MutationTy::*;
-	match MutationTy::choose_replacement_kind() {
-		HVar => {
-			let (replacement_node, annotation, _) = random_subnode(&ctxt, term, ty, 1, 1);
+	match dbg!(MutationTy::choose_replacement_kind()) {
+		k @ HVar | k @ Small => {
+			let (lo, hi) = if k == HVar {
+				(1, 1)
+			} else {
+				(2, L::SMALL_SIZE)
+			};
 
-			let (_, proposal) =
-				cache.sample(lang, annotation.decls, &annotation.ty, annotation.size);
+			let (replacement_id, replacement_node, note, _) = random_subnode(term, meta, lo, hi)?;
 
-			let (new_term, _analysis) = proposal.unwrap();
+			let (_, sample) = cache.sample(lang, note.decls.clone(), &note.ty, note.size);
 
-			let candidate = replace_subnode(term, replacement_node, new_term);
+			let (replacement, _analysis) = sample?;
 
-			Some((candidate, 1.))
-		}
-		Small => {
-			let (replacement_node, annotation, _) =
-				random_subnode(&ctxt, term, ty, 2, L::SMALL_SIZE);
+			let replacement_meta = annotate(ctxt, &replacement, &note.ty, &note.decls);
 
-			let (_, replacement) =
-				cache.sample(lang, annotation.decls, &annotation.ty, annotation.size);
+			*replacement_node = replacement;
 
-			let (new_term, _analysis) = replacement.unwrap();
+			repair_metadata(term, meta, replacement_id, replacement_meta);
 
-			let proposal = replace_subnode(term, replacement_node, new_term);
+			println!("term is {}", term);
 
-			if !proposal.in_beta_normal_form() {
-				return None;
-			}
-
-			Some((proposal, 1.))
+			Some(1.)
 		}
 		Large => {
 			use rand::distributions::Distribution;
 			use statrs::distribution::Binomial;
 
-			let (replacement_node, annotation, subnode_count) =
-				random_subnode(&ctxt, term, ty, 2, L::LARGE_SIZE);
+			let lo = 2;
+			let hi = L::LARGE_SIZE;
 
-			if subnode_count == 0 {
-				return None;
-			}
+			let (replacement_id, replacement_node, note, subnode_count) =
+				random_subnode(term, meta, lo, hi)?;
 
-			let ratio = annotation.size as f64 / L::LARGE_SIZE as f64;
+			let ratio = note.size as f64 / L::LARGE_SIZE as f64;
 
 			let size_distr = Binomial::new(ratio, L::LARGE_SIZE as u64).ok()?;
 			let replacement_size: u64 = size_distr.sample(&mut rand::thread_rng());
 			let replacement_size = replacement_size as usize;
 
-			let (new_count, replacement) = cache.sample(
-				lang,
-				annotation.decls.clone(),
-				&annotation.ty,
-				replacement_size,
-			);
+			dbg!(replacement_size);
 
-			let (replacement, _analysis) = replacement?;
+			let (new_count, sample) =
+				cache.sample(lang, note.decls.clone(), &note.ty, replacement_size);
 
-			let proposal = replace_subnode(term, replacement_node, replacement);
+			let (replacement, _analysis) = sample?;
 
-			if !proposal.in_beta_normal_form() {
-				return None;
-			}
+			let replacement_meta = annotate(ctxt, &replacement, &note.ty, &note.decls);
+			*replacement_node = replacement;
+			
+			repair_metadata(term, meta, replacement_id, replacement_meta);
 
-			let old_count =
-				cache.query_count(lang, annotation.decls, &annotation.ty, annotation.size);
+			let old_count = cache.query_count(lang, note.decls, &note.ty, note.size);
 
 			// g1 = g(x' | x)
-			let g1 = g::<L>(subnode_count, replacement_size, annotation.size, new_count);
+			let g1 = g::<L>(subnode_count, replacement_size, note.size, new_count);
 
-			let (_, _, subnode_count) = random_subnode(&ctxt, &proposal, ty, 2, L::LARGE_SIZE);
-
-			if subnode_count == 0 {
-				return None;
-			}
+			let subnode_count = meta.iter().filter(|s| (lo..=hi).contains(&s.size)).count();
 
 			//g2 = g(x | x')
-			let g2 = g::<L>(subnode_count, annotation.size, replacement_size, old_count);
+			let g2 = g::<L>(subnode_count, note.size, replacement_size, old_count);
 
-			Some((proposal, g2 / g1))
+			println!("term is {}", term);
+
+			Some(g2 / g1)
 		}
 	}
 }
@@ -186,185 +188,246 @@ fn g<L: Language>(
 	prob_subnode_selected * prob_size_selected * prob_replacement_generated
 }
 
-pub fn replace_subnode(dest: &Term, node_id: usize, src: Term) -> Term {
-	fn helper(counter: &mut usize, dest: &Term, node_id: usize, src: Term) -> Term {
-		*counter += 1;
+fn repair_metadata(
+	term: &ImmutableTerm,
+	meta: &mut Metadata,
+	replacement_id: usize,
+	replacement_metadata: Metadata,
+) {
+	fn traverse(term: &ImmutableTerm, id: usize, decls: &mut VarsVec, meta: &mut Metadata) {
+		use ImmutableTerm::*;
+		match term {
+			ILam(v, b) => {
+				let Type::Fun(arg, _) = &*meta[id].ty else {
+					unreachable!()
+				};
 
-		if *counter == node_id {
-			return src;
-		}
+				decls.push((*v, arg.clone()));
+				traverse(b, id + 1, decls, meta);
+				decls.pop();
 
-		use Term::*;
-		match dest {
-			Ref(r) => helper(counter, &(**r).borrow(), node_id, src),
-			Lam(v, b) => Lam(*v, helper(counter, b, node_id, src).into()),
-			App(l, r) => {
-				let l = &(**l).borrow().clone();
-				let l = helper(counter, l, node_id, src.clone());
-				let r = &(**r).borrow().clone();
-				let r = helper(counter, r, node_id, src);
-				App(l.into(), r.into())
+				meta[id].size = 1 + meta[id + 1].size;
+				meta[id].decls = decls.clone();
 			}
-			_ => dest.clone(),
-		}
-	}
+			IApp(l, r) => {
+				let l_id = id + 1;
+				traverse(l, l_id, decls, meta);
+				let l_size = meta[l_id].size;
 
-	helper(&mut 0, dest, node_id, src)
-}
+				let r_id = l_id + l_size;
+				traverse(r, r_id, decls, meta);
+				let r_size = meta[r_id].size;
 
-// Reservoir sampling, again.
-// We return the index of the subnode (using pre-order numbering) & its size
-// Returns (node_id, annotation, small_node_count)
-pub fn random_subnode(
-	ctxt: &Context,
-	term: &Term,
-	ty: &Type,
-	min_size: usize,
-	max_size: usize,
-) -> (usize, Annotation, usize) {
-	let mut selected_id: usize = 0;
-	let mut stack = vec![(term.clone(), term as *const Term)];
-	let mut counter = 1;
-	let mut small_counter = 0;
-
-	let metadata = annotate_term(term, ctxt, ty);
-
-	let ptr = term as *const Term;
-	let mut annotation = metadata.get(&ptr).unwrap();
-
-	while let Some((next, ptr)) = stack.pop() {
-		let size = next.size();
-
-		if (min_size..=max_size).contains(&size) {
-			small_counter += 1;
-			if with_probability(1. / small_counter as f64) {
-				selected_id = counter;
-				annotation = metadata.get(&ptr).unwrap();
-			}
-		}
-
-		use Term::*;
-		match next {
-			Ref(r) => stack.push((r.borrow().clone(), r.as_ptr())),
-			Lam(_, b) => stack.push(((*b).clone(), b.as_ref() as *const Term)),
-			App(l, r) => {
-				stack.push((r.borrow().clone(), r.as_ptr()));
-				stack.push((l.borrow().clone(), l.as_ptr()));
+				meta[id].size = 1 + l_size + r_size;
+				meta[id].decls = decls.clone();
 			}
 			_ => (),
 		}
-
-		counter += 1;
 	}
 
-	(selected_id, annotation.clone(), small_counter)
+	println!("term={}", term);
+
+	println!("repl_meta = {:?}", replacement_metadata);
+	
+	let old_size = meta[replacement_id].size;
+	
+	meta.splice(
+		replacement_id..replacement_id + old_size,
+		replacement_metadata,
+	);
+
+	println!("midswap =  {:?}", meta);
+
+	traverse(term, 0, &mut vec![], meta);
+	println!("meta={:?}", meta);
 }
 
-#[derive(Clone, Debug)]
-pub struct Annotation {
-	size: usize,
-	ty: Type,
-	decls: VarsVec, // Variables in scope
-}
+// Returns (id, ref, note, small_count)
+pub fn random_subnode<'a>(
+	term: &'a mut ImmutableTerm,
+	metadata: &Metadata,
+	min_size: usize,
+	max_size: usize,
+) -> Option<(usize, &'a mut ImmutableTerm, Annotation, usize)> {
+	fn get_id<'a>(
+		term: &'a mut ImmutableTerm,
+		id: usize,
+		metadata: &Metadata,
+	) -> &'a mut ImmutableTerm {
+		fn traverse<'a>(
+			term: &'a mut ImmutableTerm,
+			id: usize,
+			metadata: &Metadata,
+			term_id: usize,
+		) -> &'a mut ImmutableTerm {
+			if term_id == id {
+				return term;
+			}
 
-type Metadata = HashMap<*const Term, Annotation>;
+			use ImmutableTerm::*;
+			match term {
+				ILam(_, b) => traverse(Rc::make_mut(b), id, metadata, term_id + 1),
+				IApp(l, r) => {
+					let l_id = term_id + 1;
+					let l_size = metadata[l_id].size;
 
-// Can fail if Term is not in beta-nf
-fn annotate_term(term: &Term, ctxt: &Context, ty: &Type) -> Metadata {
-	fn annotate(
-		term: &Term,
-		ctxt: &Context,
-		ty: Option<&Type>,
-		map: &mut Metadata,
-		decls: &VarsVec,
-	) {
-		let ptr = term as *const Term;
+					let r_id = l_id + l_size;
 
-		if map.contains_key(&ptr) {
-			return;
+					if id < r_id {
+						traverse(Rc::make_mut(l), id, metadata, l_id)
+					} else {
+						traverse(Rc::make_mut(r), id, metadata, r_id)
+					}
+				}
+				_ => unreachable!(),
+			}
 		}
 
-		use Term::*;
+		traverse(term, id, metadata, 0)
+	}
+
+	let range = min_size..=max_size;
+
+	let (small_count, selection) = reservoir_sample(
+		metadata
+			.iter()
+			.enumerate()
+			.filter(|(_, s)| range.contains(&s.size))
+			.map(|(i, s)| (i, s.clone())),
+	);
+
+	let (choice_id, note) = selection.unwrap();
+
+	println!("id:   {}", choice_id);
+	println!("note: {:?}", note);
+	println!("meta: {:?}", metadata);
+
+	let choice = get_id(term, choice_id, metadata);
+
+	Some((choice_id, choice, note, small_count))
+}
+
+// Annotations in pre-order.
+type Metadata = Vec<Annotation>;
+
+// Fails if term is not in beta-nf
+pub fn annotate(ctxt: &Context, term: &ImmutableTerm, ty: &Type, decls: &VarsVec) -> Metadata {
+	fn traverse(
+		ctxt: &Context,
+		term: &ImmutableTerm,
+		ty: Option<&Type>,
+		metadata: &mut Metadata,
+		decls: &mut VarsVec,
+	) {
+		use ImmutableTerm::*;
+
+		let id = metadata.len();
+		metadata.push(Annotation::default());
+
 		let annotation = match term {
-			Ref(r) => {
-				annotate(&r.borrow(), ctxt, ty, map, decls);
-
-				let ptr = r.as_ptr() as *const Term;
-
-				map.get(&ptr).unwrap().clone()
-			}
-			Num(_) => Annotation {
+			INum(_) => Annotation {
 				size: 1,
+				ty: Type::Int.into(),
 				decls: decls.clone(),
-				ty: Type::Int,
 			},
-			Var(v) => {
-				if let Some((_, v_ty)) = decls.iter().find(|(s, _)| v == s) {
-					Annotation {
-						size: 1,
-						ty: (**v_ty).clone(),
-						decls: decls.clone(),
-					}
+			IVar(v) => {
+				let v_ty = if let Some((_, v_ty)) = decls.iter().find(|(s, _)| v == s) {
+					v_ty.clone()
 				} else if let Some(builtin) = ctxt.get(*v) {
-					Annotation {
-						size: 1,
-						ty: (*builtin.ty).clone(),
-						decls: decls.clone(),
-					}
+					builtin.ty.clone()
 				} else {
-					panic!("Undeclared variable")
+					panic!("Undeclared variable: {}", v)
+				};
+
+				if let Some(ty) = ty {
+					debug_assert!(&*v_ty == ty);
+				}
+
+				Annotation {
+					size: 1,
+					ty: v_ty,
+					decls: decls.clone(),
 				}
 			}
-			Lam(v, b) => {
+			ILam(v, b) => {
 				let ty = ty.unwrap().clone();
 
 				let Type::Fun(arg, ret) = ty.clone() else {
 					unimplemented!()
 				};
 
-				let decls = decls.clone();
+				decls.push((*v, arg.clone()));
 
-				let mut body_decls = decls.clone();
-				body_decls.push((*v, arg.clone()));
+				traverse(ctxt, b, Some(ret.as_ref()), metadata, decls);
 
-				annotate(b, ctxt, Some(ret.as_ref()), map, &body_decls);
+				decls.pop();
 
+				let ty = Rc::from(ty);
 				Annotation {
 					size: term.size(),
 					ty,
-					decls,
+					decls: decls.clone(),
 				}
 			}
-			App(l, r) => {
-				let f = l.as_ptr() as *const Term;
+			IApp(l, r) => {
+				let l_id = metadata.len();
 
-				annotate(&l.borrow(), ctxt, None, map, decls);
+				traverse(ctxt, l, None, metadata, decls);
 
-				let f_note = map.get(&f).unwrap().clone();
+				// Since we use pre-ordered annotations as data.
+				let f_note = metadata[l_id].clone();
 
-				let Type::Fun(arg, ret) = f_note.ty else {
+				let Type::Fun(arg, ret) = &*f_note.ty else {
 					unreachable!()
 				};
 
-				annotate(&r.borrow(), ctxt, Some(&*arg), map, decls);
+				traverse(ctxt, r, Some(arg), metadata, decls);
 
 				Annotation {
 					size: term.size(),
-					ty: (*ret).clone(),
-					decls: f_note.decls,
+					ty: ret.clone(),
+					decls: f_note.decls.clone(),
 				}
 			}
 		};
 
-		map.insert(ptr, annotation);
+		metadata[id] = annotation;
 	}
 
-	let mut map = Metadata::default();
-	annotate(term, ctxt, Some(ty), &mut map, &vec![]);
-	map
+	assert!(term.in_beta_normal_form());
+
+	let mut metadata = Vec::with_capacity(term.size());
+
+	traverse(ctxt, term, Some(ty), &mut metadata, &mut decls.clone());
+
+	metadata
 }
 
-#[derive(Debug)]
+#[derive(Clone)]
+pub struct Annotation {
+	size: usize,
+	ty: Rc<Type>,
+	decls: VarsVec, // Variables in scope
+}
+
+impl Default for Annotation {
+	fn default() -> Self {
+		Self {
+			size: 0,
+			ty: Type::Int.into(),
+			decls: vec![],
+		}
+	}
+}
+
+use std::fmt::*;
+impl Debug for Annotation {
+	fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+		write!(f, "{{|{}|, {}, {:?} }}", self.size, self.ty, self.decls)
+	}
+}
+
+#[derive(Debug, PartialEq, Eq)]
 enum MutationTy {
 	HVar,
 	Small,
@@ -392,7 +455,7 @@ struct SizeCache<L: Language> {
 }
 
 enum CacheEntry<L: Language> {
-	Explicit(Vec<(Term, Analysis<L>)>),
+	Explicit(Vec<(ImmutableTerm, Analysis<L>)>),
 	Count(usize),
 }
 
@@ -405,7 +468,7 @@ impl<L: Language> SizeCache<L> {
 		mut decls: VarsVec,
 		ty: &Type,
 		size: usize,
-	) -> (usize, Option<(Term, Analysis<L>)>) {
+	) -> (usize, Option<(ImmutableTerm, Analysis<L>)>) {
 		use CacheEntry::*;
 
 		decls.sort();

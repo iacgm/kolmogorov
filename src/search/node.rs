@@ -26,14 +26,14 @@ pub(super) enum Node<L: Language> {
 		targ: Rc<Type>,
 		size: usize,
 		l_ty: Rc<Type>,
-		left: Thunk,
+		left: ImmutableTerm,
 		left_analysis: Analysis<L>,
 		res: SearchResult<L>,
 		state: Option<Box<Node<L>>>,
 		arg_state: Option<Box<Node<L>>>,
 	},
 	Cached {
-		list: Vec<(Term, Analysis<L>)>,
+		list: Vec<(ImmutableTerm, Analysis<L>)>,
 		next: Box<Node<L>>,
 	},
 	Nil,
@@ -53,7 +53,10 @@ impl AllPhase {
 }
 
 impl<L: Language> Node<L> {
-	pub fn next(&mut self, search_ctxt: &mut SearchContext<L>) -> Option<(Term, Analysis<L>)> {
+	pub fn next(
+		&mut self,
+		search_ctxt: &mut SearchContext<L>,
+	) -> Option<(ImmutableTerm, Analysis<L>)> {
 		use Node::*;
 		loop {
 			#[cfg(feature = "fulltrace")]
@@ -177,7 +180,7 @@ impl<L: Language> Node<L> {
 					if let Some(curr_state) = state {
 						return match curr_state.next(search_ctxt) {
 							Some((term, analysis)) => {
-								let term = Term::Lam(ident, term.into());
+								let term = ImmutableTerm::ILam(ident, term.into());
 								let analysis = search_ctxt.lang.slam(ident, analysis);
 								Some((term, analysis))
 							}
@@ -221,7 +224,7 @@ impl<L: Language> Node<L> {
 
 					if size == 1 {
 						if v_ty == *targ {
-							return Some((Term::Var(var), search_ctxt.lang.svar(var)));
+							return Some((ImmutableTerm::IVar(var), search_ctxt.lang.svar(var)));
 						} else {
 							continue;
 						}
@@ -233,7 +236,7 @@ impl<L: Language> Node<L> {
 						targ: targ.clone(),
 						size: size - 1,
 						l_ty: v_ty,
-						left: Term::Var(var).into(),
+						left: ImmutableTerm::IVar(var),
 						left_analysis: analysis,
 						state: None,
 						arg_state: None,
@@ -274,7 +277,7 @@ impl<L: Language> Node<L> {
 							unreachable!()
 						};
 
-						return Some((left.borrow().clone(), left_analysis.clone()));
+						return Some((left.clone(), left_analysis.clone()));
 					} else if size == 0 || targ == l_ty {
 						*self = Nil;
 						return None;
@@ -341,7 +344,7 @@ impl<L: Language> Node<L> {
 					};
 
 					let analysis = search_ctxt.lang.sapp(left_analysis.clone(), arg_analysis);
-					let left = Term::App(left.clone(), arg.into());
+					let left = ImmutableTerm::IApp(left.clone().into(), arg.into());
 
 					if let Some(term) = search_ctxt.cache.yield_term(
 						l_ty,
@@ -354,7 +357,7 @@ impl<L: Language> Node<L> {
 							targ: targ.clone(),
 							size: size - arg_size - 1,
 							l_ty: ret_ty.clone(),
-							left: term.into(),
+							left: term,
 							left_analysis: analysis,
 							state: None,
 							arg_state: None,
@@ -543,7 +546,7 @@ impl<L: Language + Debug> Display for Node<L> {
 					targ,
 					size,
 					res,
-					left.borrow(),
+					left,
 					left_analysis,
 					l_ty,
 					indent = indent

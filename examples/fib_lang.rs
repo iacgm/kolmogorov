@@ -6,6 +6,9 @@ pub struct FibLang;
 impl Language for FibLang {
 	type Semantics = OpaqueSemantics;
 
+	const SMALL_SIZE: usize = 10;
+	const LARGE_SIZE: usize = 15;
+
 	fn context(&self) -> Context {
 		use Term::*;
 
