@@ -1,4 +1,5 @@
 use std::fmt::Display;
+use std::rc::Rc;
 
 use kolmogorov::*;
 
@@ -22,32 +23,31 @@ impl Language for PolynomialLanguage {
 	const LARGE_SIZE: usize = 20;
 
 	fn context(&self) -> kolmogorov::Context {
-		use Term::*;
 		let plus = builtin!(
 			N => N => N
-			|x, y| => Num(x.int()?+y.int()?)
+			|x, y| => Term::val(x.get::<i32>()?+y.get::<i32>()?)
 		);
 
 		let mult = builtin!(
 			N => N => N
-			|x, y| => Num(x.int()?*y.int()?)
+			|x, y| => Term::val(x.get::<i32>()?*y.get::<i32>()?)
 		);
 
 		let one = builtin!(
 			N
-			| | => Num(1)
+			| | => Term::val(1)
 		);
 
 		let zero = builtin!(
 			N
-			| | => Num(0)
+			| | => Term::val(0)
 		);
 
 		context! { plus, mult, one, zero }
 	}
 
-	fn snum(&self, n: i32) -> Analysis<Self> {
-		Canonical(PolySem::num(n))
+	fn sval(&self, v: &Rc<dyn TermValue>) -> Analysis<Self> {
+		Canonical(PolySem::num(*cast(v).unwrap()))
 	}
 
 	fn svar(&self, v: Identifier) -> Analysis<Self> {

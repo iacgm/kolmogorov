@@ -19,7 +19,7 @@ fn main() {
 		let mut num_correct = max_correct;
 		for (x, y) in examples.iter().copied() {
 			let program = term! {
-				[t] [Num(x)]
+				[t] [Val(x)]
 			};
 
 			let evaled = lang_ctxt.evaluate(&program);

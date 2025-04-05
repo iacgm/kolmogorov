@@ -27,9 +27,9 @@ fn main() {
 				|c| => {
 					let c = c.int()?;
 					if 0 < c && c < n {
-						Num(fibs2[c as usize])
+						Val(fibs2[c as usize])
 					} else {
-						Num(0)
+						Val(0)
 					}
 				}
 			};
@@ -57,7 +57,7 @@ fn main() {
 			let rec_arg = prevs[n as usize].0;
 
 			let program = term! {
-				[t] [Var(rec_arg)] [Num(n)]
+				[t] [Var(rec_arg)] [Val(n)]
 			};
 
 			let evaled = exec_ctxt.evaluate(&program);

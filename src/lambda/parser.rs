@@ -10,7 +10,7 @@ macro_rules! term {
 		$x.clone()
 	};
 	($x: literal) => {
-		$crate::Term::Num($x)
+		$crate::Term::Val(std::rc::Rc::new($x))
 	};
 	($x:ident -> $($r:tt)+) => {
 		$crate::Term::Lam($crate::Identifier::Name(stringify!($x)), $crate::term!($($r)+).into())
@@ -86,17 +86,11 @@ macro_rules! context {
 
 #[macro_export]
 macro_rules! ty {
-	(N) => {
-		$crate::Type::Int
-	};
-	(Int) => {
-		$crate::Type::Int
-	};
 	([$e:expr]) => {
 		$e
 	};
 	($x: ident) => {
-		$crate::Type::Var(stringify!($x))
+		$crate::Type::Var(Identifier::from(stringify!($x)))
 	};
 	($a:tt => $($b:tt)+) => {
 		$crate::Type::Fun($crate::ty!($a).into(), $crate::ty!($($b)+).into())

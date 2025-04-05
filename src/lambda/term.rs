@@ -1,12 +1,13 @@
 use super::*;
+use std::any::Any;
 use std::cell::RefCell;
 use std::rc::Rc;
 
 pub type Thunk = Rc<RefCell<Term>>;
 
-#[derive(Clone, Debug, Eq)]
+#[derive(Clone, Debug)]
 pub enum Term {
-	Num(i32),
+	Val(Rc<dyn TermValue>),
 	Var(Identifier),
 	Lam(Identifier, Rc<Term>),
 	App(Thunk, Thunk),
@@ -19,11 +20,15 @@ pub enum Term {
 }
 
 impl Term {
+	pub fn val<T: TermValue>(x: T) -> Self {
+		Self::Val(Rc::new(x))
+	}
+
 	pub fn deep_clone(&self) -> Self {
 		use Term::*;
 		match self {
 			Ref(r) => (**r).borrow().deep_clone(),
-			Num(n) => Num(*n),
+			Val(n) => Val(n.clone()),
 			Var(v) => Var(*v),
 			Lam(v, b) => Lam(*v, b.clone()),
 			App(l, r) => App(
@@ -36,7 +41,7 @@ impl Term {
 	pub fn instantiate_var(&self, var: Identifier, thunk: &Thunk) -> Term {
 		use Term::*;
 		match self {
-			Num(n) => Num(*n),
+			Val(n) => Val(n.clone()),
 			Lam(v, b) => {
 				if *v == var {
 					Lam(*v, b.clone())
@@ -62,63 +67,37 @@ impl Term {
 		}
 	}
 
-	// `self` is a pattern which generalizes term.
-	pub fn unify(&self, term: &Term) -> Option<Vec<Term>> {
-		fn unify_into(patt: &Term, term: &Term, out: &mut Vec<Term>) -> bool {
-			use Identifier::*;
-			use Term::*;
-			match (patt, term) {
-				(Ref(r), _) => unify_into(&r.borrow(), term, out),
-				(_, Ref(r)) => unify_into(patt, &r.borrow(), out),
-				(Var(Name("_")), term) => {
-					out.push(term.clone());
-					true
-				}
-				(Var(a), Var(b)) => a == b,
-				(Num(a), Num(b)) => a == b,
-				(App(pl, pr), App(tl, tr)) => {
-					let pl = &pl.borrow();
-					let tl = &tl.borrow();
-					let pr = &pr.borrow();
-					let tr = &tr.borrow();
-					unify_into(pl, tl, out) && unify_into(pr, tr, out)
-				}
-				_ => false,
-			}
-		}
-
-		let mut vec = vec![];
-		if unify_into(self, term, &mut vec) {
-			Some(vec)
-		} else {
-			None
-		}
-	}
-
 	pub fn size(&self) -> usize {
 		use Term::*;
 		match self {
 			Ref(r) => (**r).borrow().size(),
-			Num(_) | Var(_) => 1,
+			Val(_) | Var(_) => 1,
 			Lam(_, b) => 1 + b.size(),
 			App(l, r) => 1 + l.borrow().size() + r.borrow().size(),
 		}
 	}
 
-	pub fn int(&self) -> Option<i32> {
+	pub fn leaf_val(&self) -> Option<Rc<dyn TermValue>> {
 		use Term::*;
 		match self {
-			Ref(r) => r.borrow().int(),
-			Num(n) => Some(*n),
+			Ref(r) => r.borrow().leaf_val(),
+			Val(v) => Some(v.clone()),
 			_ => None,
 		}
+	}
+
+	pub fn get<T: TermValue + Clone>(&self) -> Option<T> {
+		let rc = self.leaf_val()?;
+		let any = rc.as_any();
+		let out = any.downcast_ref::<T>()?;
+		Some(out.clone())
 	}
 
 	pub fn in_beta_normal_form(&self) -> bool {
 		use Term::*;
 		match self {
 			Ref(r) => r.borrow().in_beta_normal_form(),
-			Num(_) | Var(_) => true,
+			Val(_) | Var(_) => true,
 			Lam(_, b) => b.in_beta_normal_form(),
 			App(l, r) => {
 				!l.borrow().is_lam()
@@ -138,13 +117,35 @@ impl Term {
 	}
 }
 
+pub fn cast<T: TermValue>(rc: &Rc<dyn TermValue>) -> Option<&T> {
+	rc.as_any().downcast_ref()
+}
+
+pub trait TermValue: Any + Debug + Display {
+	// For some reason requiring PartialEq is bad but this is okay?
+	// If you don't love Rust at its trait bound restrictions,
+	// you don't deserve it at its... uhhh... nevermind...
+	fn is_eq(&self, other: &Rc<dyn TermValue>) -> bool;
+	fn as_any(&self) -> &dyn Any;
+}
+
+impl<T: Any + Debug + Display + PartialEq> TermValue for T {
+	fn is_eq(&self, other: &Rc<dyn TermValue>) -> bool {
+		Some(self) == other.as_any().downcast_ref::<T>()
+	}
+
+	fn as_any(&self) -> &dyn Any {
+		self
+	}
+}
+
 //Syntactic equality, not α-equality (might be useful to implement eventually)
 impl PartialEq for Term {
 	fn eq(&self, other: &Self) -> bool {
 		use Term::*;
 		match (self, other) {
 			(Ref(r), t) | (t, Ref(r)) => &*(**r).borrow() == t,
-			(Num(a), Num(b)) => a == b,
+			(Val(a), Val(b)) => a.is_eq(b),
 			(Var(a), Var(b)) => a == b,
 			(Lam(va, ba), Lam(vb, bb)) => va == vb && ba == bb,
 			(App(ll, lr), App(rl, rr)) => {
@@ -155,31 +156,6 @@ impl PartialEq for Term {
 				**ll == **rl && **lr == **rr
 			}
 			_ => false,
-		}
-	}
-}
-
-impl std::hash::Hash for Term {
-	fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-		use Term::*;
-		if let Ref(r) = self {
-			return (**r).borrow().hash(state);
-		} else {
-			std::mem::discriminant(self).hash(state);
-		}
-
-		match self {
-			Ref(_) => unreachable!(),
-			Num(n) => n.hash(state),
-			Var(v) => v.hash(state),
-			Lam(v, b) => {
-				v.hash(state);
-				b.hash(state);
-			}
-			App(l, r) => {
-				l.borrow().hash(state);
-				r.borrow().hash(state);
-			}
 		}
 	}
 }
@@ -196,7 +172,7 @@ impl Display for Term {
 		use Term::*;
 		match self {
 			Ref(r) => write!(fmt, "{}", (**r).borrow()),
-			Num(k) => write!(fmt, "{}", k),
+			Val(k) => write!(fmt, "{}", k),
 			Var(v) => write!(fmt, "{}", v),
 			Lam(v, b) => {
 				write!(fmt, "(\\{}", v)?;

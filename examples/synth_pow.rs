@@ -30,7 +30,7 @@ fn main() {
 				let expected = pow(n);
 
 				let program = term! {
-					[term] [Num(prev)] [Num(n)]
+					[term] [Val(prev)] [Val(n)]
 				};
 
 				let start = Instant::now();

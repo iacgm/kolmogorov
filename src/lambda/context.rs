@@ -77,7 +77,7 @@ impl Context {
 		let mut borrow = (**thunk).borrow_mut();
 		let term = &mut *borrow;
 		match term {
-			Num(_) | Lam(_, _) => (),
+			Val(_) | Lam(_, _) => (),
 			Var(v) => {
 				if let Some(BuiltIn {
 					func, n_args: 0, ..
@@ -105,7 +105,7 @@ impl Context {
 		use Term::*;
 		match root {
 			Ref(thunk) => self.collapse_spine(&mut thunk.borrow_mut(), depth),
-			Num(_) | Lam(_, _) => Whnf,
+			Val(_) | Lam(_, _) => Whnf,
 			Var(v) => match self.get(*v) {
 				Some(BuiltIn {
 					func, n_args: 0, ..
@@ -164,66 +164,6 @@ impl Context {
 				}
 			}
 		}
-	}
-
-	pub fn infer_type(&self, term: &Term) -> Type {
-		type VarsTys = HashMap<Identifier, Type>;
-		fn core(term: &Term, vgen: &mut VarGen, tsub: &mut TypeSub, vtys: &mut VarsTys) -> Type {
-			use Term::*;
-
-			match term {
-				Ref(r) => core(&r.borrow(), vgen, tsub, vtys),
-				App(l, r) => {
-					let fun = core(&l.borrow(), vgen, tsub, vtys);
-					let arg = core(&r.borrow(), vgen, tsub, vtys);
-
-					let Type::Fun(expected, ret) = fun else {
-						unreachable!()
-					};
-
-					let mut ret = (*ret).clone();
-
-					tsub.unify(&arg, &expected);
-
-					tsub.apply(&mut ret);
-
-					ret
-				}
-				Lam(v, b) => {
-					let mut tyv = Type::Var(vgen.cap_var());
-					vtys.insert(*v, tyv.clone());
-
-					let body = core(b, vgen, tsub, vtys);
-
-					tsub.apply(&mut tyv);
-
-					Type::Fun(tyv.into(), body.into())
-				}
-				Var(v) => {
-					if let Some(t) = vtys.get(v) {
-						t.clone()
-					} else {
-						let tyv = Type::Var(vgen.cap_var());
-						vtys.insert(*v, tyv.clone());
-						tyv
-					}
-				}
-				Num(_) => Type::Int,
-			}
-		}
-
-		let mut vtys = VarsTys::default();
-
-		for (v, t) in &self.defs {
-			vtys.insert(*v, (*t.ty).clone());
-		}
-
-		core(
-			term,
-			&mut Default::default(),
-			&mut Default::default(),
-			&mut vtys,
-		)
 	}
 }
 

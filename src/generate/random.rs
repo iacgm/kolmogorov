@@ -293,10 +293,10 @@ fn annotate_term(term: &Term, ctxt: &Context, ty: &Type) -> Metadata {
 
 				map.get(&ptr).unwrap().clone()
 			}
-			Num(_) => Annotation {
+			Val(_) => Annotation {
 				size: 1,
 				decls: decls.clone(),
-				ty: Type::Int,
+				ty: ty.unwrap().clone(),
 			},
 			Var(v) => {
 				if let Some((_, v_ty)) = decls.iter().find(|(s, _)| v == s) {

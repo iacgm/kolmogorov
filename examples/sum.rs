@@ -8,7 +8,7 @@ fn main() {
 
 	let plus = builtin!(
 		N => N => N
-		|x, y| => Num(x.int()?+y.int()?)
+		|x, y| => Val(x.int()?+y.int()?)
 	);
 
 	let ctxt = context! { plus };

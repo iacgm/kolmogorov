@@ -20,7 +20,7 @@ pub trait Language: Sized + Clone {
 
 	fn context(&self) -> Context;
 
-	fn snum(&self, _: i32) -> Analysis<Self> {
+	fn sval(&self, _: &Rc<dyn TermValue>) -> Analysis<Self> {
 		Analysis::Unique
 	}
 
@@ -39,7 +39,7 @@ pub trait Language: Sized + Clone {
 	fn analyze(&self, term: &Term) -> Analysis<Self> {
 		use Term::*;
 		match term {
-			Num(n) => self.snum(*n),
+			Val(v) => self.sval(v),
 			Var(v) => self.svar(*v),
 			Lam(i, b) => self.slam(*i, self.analyze(b)),
 			App(l, r) => self.sapp(self.analyze(&l.borrow()), self.analyze(&r.borrow())),

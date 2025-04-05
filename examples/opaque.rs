@@ -16,28 +16,28 @@ impl Language for Opaque {
 		use Term::*;
 		let plus = builtin!(
 			N => N => N
-			|x, y| => Num(x.int()?+y.int()?)
+			|x, y| => Val(x.int()?+y.int()?)
 		);
 
 		let mult = builtin!(
 			N => N => N
-			|x, y| => Num(x.int()?*y.int()?)
+			|x, y| => Val(x.int()?*y.int()?)
 		);
 
 		let one = builtin!(
 			N
-			| | => Num(1)
+			| | => Val(1)
 		);
 
 		let zero = builtin!(
 			N
-			| | => Num(0)
+			| | => Val(0)
 		);
 
 		context! { plus, mult, one, zero }
 	}
 
-	fn snum(&self, _: i32) -> Analysis<Self> {
+	fn sval(&self, _: i32) -> Analysis<Self> {
 		Analysis::Unique
 	}
 

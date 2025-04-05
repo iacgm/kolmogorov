@@ -20,22 +20,22 @@ impl Language for FibLang {
 
 		let plus = builtin!(
 			N => N => N
-			|x, y| => Num(x.int()?+y.int()?)
+			|x, y| => Val(x.int()?+y.int()?)
 		);
 
 		let minus = builtin!(
 			N => N => N
-			|x, y| => Num(x.int()?-y.int()?)
+			|x, y| => Val(x.int()?-y.int()?)
 		);
 
 		let one = builtin!(
 			N
-			| | => Num(1)
+			| | => Val(1)
 		);
 
 		let two = builtin!(
 			N
-			| | => Num(2)
+			| | => Val(2)
 		);
 
 		context! { lte, plus, minus, one, two}

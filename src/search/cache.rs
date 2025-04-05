@@ -126,6 +126,7 @@ impl<L: Language> Cache<L> {
 				match entry {
 					Occupied(mut entry) => {
 						let (minimal, m_size) = entry.get();
+						// Need the second check because we generate the same term several times
 						if *m_size < size || (*m_size == size && &term != minimal) {
 							return None;
 						} else {

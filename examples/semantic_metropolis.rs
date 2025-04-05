@@ -25,16 +25,15 @@ fn main() {
 	const SIZE_TUNING_PARAM: f64 = 0.25;
 
 	let int_scorer = |t: &Term| {
-		use Term::*;
 		let mut num_correct = 0;
 		for (x, y) in examples.iter().copied() {
 			let program = term! {
-				[t] [Num(x)]
+				[t] [Term::val(x)]
 			};
 
 			let evaled = lang_ctxt.evaluate(&program);
 
-			let output = evaled.int().unwrap();
+			let output = evaled.get::<i32>().unwrap();
 
 			if output == y {
 				num_correct += 1;

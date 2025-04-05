@@ -14,22 +14,22 @@ fn fib_ctx() -> Context {
 
 	let plus = builtin!(
 		N => N => N
-		|x, y| => Num(x.int()?+y.int()?)
+		|x, y| => Val(x.int()?+y.int()?)
 	);
 
 	let minus = builtin!(
 		N => N => N
-		|x, y| => Num(x.int()?-y.int()?)
+		|x, y| => Val(x.int()?-y.int()?)
 	);
 
 	let one = builtin!(
 		N
-		| | => Num(1)
+		| | => Val(1)
 	);
 
 	let two = builtin!(
 		N
-		| | => Num(2)
+		| | => Val(2)
 	);
 
 	(context! { lte, plus, minus, one, two }, None)
@@ -66,9 +66,9 @@ fn main() {
 				|c| => {
 					let c = c.int()?;
 					if 0 < c && c < n {
-						Num(fibs2[c as usize])
+						Val(fibs2[c as usize])
 					} else {
-						Num(0)
+						Val(0)
 					}
 				}
 			};
@@ -99,7 +99,7 @@ fn main() {
 				let rec_arg = prevs[n as usize - 1].0;
 
 				let program = term! {
-					[term] [Var(rec_arg)] [Num(n)]
+					[term] [Var(rec_arg)] [Val(n)]
 				};
 
 				let start_exec = Instant::now();

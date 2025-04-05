@@ -14,7 +14,6 @@ impl TypeSub {
 
 		fn contains(sub: &RefSub, s: Identifier, t: &Type) -> bool {
 			match t {
-				Int => false,
 				Var(v) if *v == s => true,
 				Var(v) => {
 					if let Some(t) = sub.get(v) {
@@ -32,7 +31,6 @@ impl TypeSub {
 
 		while let Some(pair) = stack.pop() {
 			match pair {
-				(Int, Int) => continue,
 				(Var(x), Var(y)) if x == y => continue,
 				(t, Var(v)) | (Var(v), t) => {
 					if contains(&subs, *v, t) {
@@ -54,7 +52,6 @@ impl TypeSub {
 					stack.push((lx, rx));
 					stack.push((ly, ry));
 				}
-				_ => return None,
 			}
 		}
 
@@ -75,7 +72,6 @@ impl TypeSub {
 	pub fn apply(&self, ty: &mut Type) {
 		use Type::*;
 		match ty {
-			Int => (),
 			Var(v) => {
 				if let Some(new) = self.dict.get(v) {
 					*ty = new.clone();
