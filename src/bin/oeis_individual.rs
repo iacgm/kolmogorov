@@ -7,10 +7,17 @@ use utils::*;
 
 fn main() -> std::io::Result<()> {
 	let lang = Polynomials;
-	let oeis = oeis::OEISMap::load()?;
+	let oeis = oeis::load_oeis()?;
 
-	for (id, nums) in oeis.iter() {
-		println!("Searching for: A{:06}", id);
+	let mut output_file = std::fs::File::create("data/oeis_individual")?;
+
+	println!("{} sequences:", oeis.len());
+
+	let mut keys = oeis.keys().collect::<Vec<_>>();
+	keys.sort();
+
+	for id in keys {
+		let nums = &oeis[id];
 
 		let examples = nums.iter().cloned().enumerate().map(|(i, n)| (i as i32, n));
 
@@ -21,16 +28,22 @@ fn main() -> std::io::Result<()> {
 			ty!(N => N),
 			SynthesisParameters {
 				bias: SizeBias::DistAbs { mean: 20, c: 0.5 },
-				iterations: 100_000,
 				..Default::default()
 			},
 			Options { print_freq: None },
 		);
 
 		if output.score.is_none() {
+			use std::io::*;
+
 			let term = output.term;
 			let analysis = lang.analyze(&term);
-			println!("Solution found for {}: {} (≈ {})", id, term, analysis);
+
+			let text = format!("Solution found for A{:06}: {} (≈ {})", id, term, analysis);
+
+			println!("{}", text);
+			write!(output_file, "{}", text)?;
+			output_file.flush()?;
 		}
 	}
 

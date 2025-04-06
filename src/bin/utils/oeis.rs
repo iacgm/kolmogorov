@@ -1,46 +1,43 @@
 use rustc_hash::FxHashMap as HashMap;
 
-#[derive(Default)]
-pub struct OEISMap {
-	seqs: HashMap<usize, Vec<i32>>,
-}
+const MIN_EXAMPLE_COUNT: usize = 30;
 
-impl OEISMap {
-	pub fn load() -> std::io::Result<OEISMap> {
-		const FILENAME: &str = "data/stripped";
+pub type OEISMap = HashMap<usize, Vec<i32>>;
 
-		let mut map = OEISMap::default();
+pub fn load_oeis() -> std::io::Result<OEISMap> {
+	const FILENAME: &str = "data/stripped";
 
-		let file = std::fs::read_to_string(FILENAME)?;
+	let mut map = OEISMap::default();
 
-		'lines: for line in file.lines() {
-			let mut words = line.trim().split(",");
+	let file = std::fs::read_to_string(FILENAME)?;
 
-			let name = words.next().unwrap().trim();
-			let id = name[1..].parse::<usize>().unwrap();
+	'lines: for line in file.lines() {
+		let mut words = line.trim().split(",");
 
-			let mut nums = vec![];
+		let name = words.next().unwrap().trim();
+		let id = name[1..].parse::<usize>().unwrap();
 
-			for word in words {
-				if word.is_empty() {
-					// Since each line ends in a comma
-					continue;
-				}
+		let mut nums = vec![];
 
-				let Ok(n) = word.parse::<i32>() else {
-					continue 'lines;
-				};
-
-				nums.push(n)
+		for word in words {
+			if word.is_empty() {
+				// Since each line ends in a comma
+				continue;
 			}
 
-			map.seqs.insert(id, nums);
+			let Ok(n) = word.parse::<i32>() else {
+				continue 'lines;
+			};
+
+			nums.push(n)
 		}
 
-		Ok(map)
+		if nums.len() < MIN_EXAMPLE_COUNT {
+			continue 'lines;
+		}
+
+		map.insert(id, nums);
 	}
 
-	pub fn iter(&self) -> impl Iterator<Item = (&usize, &Vec<i32>)> {
-		self.seqs.iter()
-	}
+	Ok(map)
 }
