@@ -6,6 +6,9 @@ macro_rules! term {
 	($x: ident) => {
 		$crate::Term::Var($crate::Identifier::Name(stringify!($x)))
 	};
+	([:$x: expr]) => {
+		Term::val($x)
+	};
 	([$x: expr]) => {
 		$x.clone()
 	};

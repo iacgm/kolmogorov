@@ -24,10 +24,11 @@ pub fn metropolis<F: FnMut(&Term) -> Option<f64>, L: Language>(
 	ty: &Type,
 	mut scorer: F,
 	iterations: usize,
-) -> Term {
+) -> (usize, Term) {
+	let mut i = 0;
 	let mut candidate = start.clone();
 	let Some(mut score) = scorer(start) else {
-		return start.clone();
+		return (i, start.clone());
 	};
 
 	let mut best_candidate = start.clone();
@@ -35,7 +36,8 @@ pub fn metropolis<F: FnMut(&Term) -> Option<f64>, L: Language>(
 
 	let mut cache = SizeCache::default();
 
-	for i in 0..iterations {
+	while i < iterations {
+		i += 1;
 		if i % PRINT_FREQ == 0 {
 			println!(
 				"Metropolis progress: {}/{}. Size {}",
@@ -51,7 +53,7 @@ pub fn metropolis<F: FnMut(&Term) -> Option<f64>, L: Language>(
 		};
 
 		let Some(proposal_score) = scorer(&proposal) else {
-			return proposal;
+			return (i, proposal);
 		};
 
 		if proposal_score > best_score {
@@ -69,7 +71,7 @@ pub fn metropolis<F: FnMut(&Term) -> Option<f64>, L: Language>(
 		}
 	}
 
-	best_candidate
+	(i, best_candidate)
 }
 
 // Mutates a &Term. Also returns g(x|x') / g(x'|x) [where x' is the proposal]

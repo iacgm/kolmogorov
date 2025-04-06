@@ -1,5 +1,5 @@
 use kolmogorov::{
-	random::{random_subnode, replace_subnode},
+	metro::{random_subnode, replace_subnode},
 	*,
 };
 

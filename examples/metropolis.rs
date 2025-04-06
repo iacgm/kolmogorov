@@ -1,4 +1,4 @@
-use kolmogorov::{random::metropolis, *};
+use kolmogorov::{metro::metropolis, *};
 
 mod opaque;
 use opaque::*;

@@ -1,7 +1,7 @@
 use statrs::distribution::{Continuous, Normal};
 use std::rc::Rc;
 
-use kolmogorov::{random::metropolis, *};
+use kolmogorov::{metro::metropolis, *};
 
 mod fib_lang;
 use fib_lang::*;

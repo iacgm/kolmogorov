@@ -3,7 +3,7 @@ use std::rc::Rc;
 
 use kolmogorov::*;
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub struct PolynomialLanguage;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -54,13 +54,13 @@ impl Language for PolynomialLanguage {
 		use Identifier::*;
 		match v {
 			Name("plus") => {
-				let a = Uuid(0);
-				let b = Uuid(1);
+				let a = uuid();
+				let b = uuid();
 				Canonical(PolySem(vec![a, b], Sum::from([a, b])))
 			}
 			Name("mult") => {
-				let a = Uuid(0);
-				let b = Uuid(1);
+				let a = uuid();
+				let b = uuid();
 				Canonical(PolySem(vec![a, b], Product::from([a, b]).into()))
 			}
 			Name("zero") => Canonical(PolySem::num(0)),

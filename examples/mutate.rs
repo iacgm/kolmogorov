@@ -10,7 +10,7 @@ fn main() {
 
 	let ty = ty!(N => N);
 
-	let (mutated, _) = random::mutate(&lang, &inc, &ty).unwrap();
+	let (mutated, _) = metro::mutate(&lang, &inc, &ty).unwrap();
 
 	println!("Old: {}", inc);
 	println!("New: {}", mutated);
