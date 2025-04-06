@@ -25,22 +25,22 @@ impl Language for Polynomials {
 	fn context(&self) -> kolmogorov::Context {
 		let plus = builtin!(
 			N => N => N
-			|x, y| => Term::val(x.get::<i32>()?+y.get::<i32>()?)
+			|x, y| => Term::val(x.get::<i32>().wrapping_add(y.get::<i32>()))
 		);
 
 		let mult = builtin!(
 			N => N => N
-			|x, y| => Term::val(x.get::<i32>()?*y.get::<i32>()?)
+			|x, y| => Term::val(x.get::<i32>().wrapping_mul(y.get::<i32>()))
 		);
 
 		let one = builtin!(
 			N
-			| | => Term::val(1)
+			| | => Term::val(1i32)
 		);
 
 		let zero = builtin!(
 			N
-			| | => Term::val(0)
+			| | => Term::val(0i32)
 		);
 
 		context! { plus, mult, one, zero }

@@ -14,8 +14,18 @@ const REPLACE_SMALL: f64 = 0.40;
 #[allow(unused)]
 const REPLACE_LARGE: f64 = 1. - REPLACE_VAR - REPLACE_SMALL;
 
-// How often we print out progress
-const PRINT_FREQ: usize = 100;
+#[derive(Clone, Copy)]
+pub struct Options {
+	pub print_freq: Option<usize>, // How often we print out progress, if at all
+}
+
+impl Default for Options {
+	fn default() -> Self {
+		Self {
+			print_freq: Some(100),
+		}
+	}
+}
 
 // If F returns None, we stop immediately
 pub fn metropolis<F: FnMut(&Term) -> Option<f64>, L: Language>(
@@ -24,6 +34,7 @@ pub fn metropolis<F: FnMut(&Term) -> Option<f64>, L: Language>(
 	ty: &Type,
 	mut scorer: F,
 	iterations: usize,
+	options: Options,
 ) -> (usize, Term) {
 	let mut i = 0;
 	let mut candidate = start.clone();
@@ -38,13 +49,16 @@ pub fn metropolis<F: FnMut(&Term) -> Option<f64>, L: Language>(
 
 	while i < iterations {
 		i += 1;
-		if i % PRINT_FREQ == 0 {
-			println!(
-				"Metropolis progress: {}/{}. Size {}",
-				i,
-				iterations,
-				candidate.size()
-			);
+
+		if let Some(freq) = options.print_freq {
+			if i % freq == 0 {
+				println!(
+					"Metropolis progress: {}/{}. Size {}",
+					i,
+					iterations,
+					candidate.size()
+				);
+			}
 		}
 
 		// g_ratio = g(x|x') / g(x'|x)

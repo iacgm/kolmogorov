@@ -23,7 +23,7 @@ fn main() {
 
 			let evaled = lang_ctxt.evaluate(&program);
 
-			let output = evaled.get::<i32>().unwrap();
+			let output = evaled.get::<i32>();
 
 			if output != y {
 				num_correct -= 1.;
@@ -43,7 +43,8 @@ fn main() {
 
 	let iterations = 50_000;
 
-	let (_, metropolis_search) = metropolis(&lang, &start, &ty, scorer, iterations);
+	let (_, metropolis_search) =
+		metropolis(&lang, &start, &ty, scorer, iterations, Options::default());
 
 	println!("Best Found: {}", metropolis_search);
 }

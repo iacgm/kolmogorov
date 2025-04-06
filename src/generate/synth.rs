@@ -2,7 +2,7 @@ use super::*;
 
 use statrs::distribution::{Continuous, Normal};
 
-pub struct Settings {
+pub struct SynthesisParameters {
 	pub bias: SizeBias,
 	pub score_factor: f64,
 	pub iterations: usize,
@@ -16,12 +16,12 @@ pub struct MetropolisOutput {
 	pub score: Option<f64>,
 }
 
-impl Default for Settings {
+impl Default for SynthesisParameters {
 	fn default() -> Self {
 		Self {
 			bias: SizeBias::Unbiased,
 			score_factor: 0.5,
-			iterations: 100_000,
+			iterations: 50_000,
 		}
 	}
 }
@@ -31,16 +31,17 @@ pub fn simple_map<L, I, O>(
 	examples: impl Iterator<Item = (I, O)>,
 	start: Term,
 	ty: Type,
-	settings: Settings,
+	settings: SynthesisParameters,
+	options: Options,
 ) -> MetropolisOutput
 where
 	L: Language,
 	I: TermValue + Clone,
 	O: TermValue + Clone,
 {
-	let num_examples = 10;
-
 	let examples = examples.map(|(i, o)| (Term::val(i), o)).collect::<Vec<_>>();
+	
+	let num_examples = examples.len();
 
 	let lang_ctxt = lang.context();
 
@@ -54,7 +55,7 @@ where
 			let evaled = lang_ctxt.evaluate(&program);
 
 			let Some(output) = evaled.leaf_val() else {
-				unimplemented!("Term did not evaluate to value.")
+				unimplemented!("Term `{}` did not evaluate to value.", evaled);
 			};
 
 			if o.is_eq(&output) {
@@ -77,7 +78,7 @@ where
 	};
 
 	let start_time = std::time::Instant::now();
-	let (iterations, term) = metropolis(&lang, &start, &ty, scorer, settings.iterations);
+	let (iterations, term) = metropolis(&lang, &start, &ty, scorer, settings.iterations, options);
 	let end_time = std::time::Instant::now();
 
 	let num_correct = int_scorer(&term);

@@ -17,22 +17,22 @@ impl Language for Opaque {
 
 		let plus = builtin!(
 			N => N => N
-			|x, y| => Term::val(int(&x)?+int(&y)?)
+			|x, y| => Term::val(int(&x)+int(&y))
 		);
 
 		let mult = builtin!(
 			N => N => N
-			|x, y| => Term::val(int(&x)?*int(&y)?)
+			|x, y| => Term::val(int(&x)*int(&y))
 		);
 
 		let one = builtin!(
 			N
-			| | => Term::val(1)
+			| | => Term::val(1i32)
 		);
 
 		let zero = builtin!(
 			N
-			| | => Term::val(0)
+			| | => Term::val(0i32)
 		);
 
 		context! { plus, mult, one, zero }

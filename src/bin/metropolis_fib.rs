@@ -24,7 +24,7 @@ fn main() {
 			let def = builtin! {
 				N => N
 				|c| => {
-					let c = c.get::<i32>()?;
+					let c = c.get::<i32>();
 					if 0 < c && c < n {
 						Term::val(fibs2[c as usize])
 					} else {
@@ -61,7 +61,7 @@ fn main() {
 
 			let evaled = exec_ctxt.evaluate(&program);
 
-			let output = evaled.get::<i32>().unwrap();
+			let output = evaled.get::<i32>();
 
 			if output == f_n {
 				num_correct += 1;
@@ -90,7 +90,8 @@ fn main() {
 
 	let iterations = 150_000;
 
-	let (_, metropolis_search) = metropolis(&lang, &start, &ty, scorer, iterations);
+	let (_, metropolis_search) =
+		metropolis(&lang, &start, &ty, scorer, iterations, Options::default());
 
 	println!("Best Found: {}", &metropolis_search);
 	println!("Semantics:  {}", lang.analyze(&metropolis_search));

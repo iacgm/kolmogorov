@@ -11,7 +11,7 @@ impl Language for FibLang {
 
 		let lte = builtin!(
 			N => N => N => N => N
-			|a, b| => if int(&a)? <= int(&b)? {
+			|a, b| => if int(&a) <= int(&b) {
 				term!(a b -> a)
 			} else {
 				term!(a b -> b)
@@ -20,22 +20,22 @@ impl Language for FibLang {
 
 		let plus = builtin!(
 			N => N => N
-			|x, y| => Term::val(int(&x)?+int(&y)?)
+			|x, y| => Term::val(int(&x)+int(&y))
 		);
 
 		let minus = builtin!(
 			N => N => N
-			|x, y| => Term::val(int(&x)?-int(&y)?)
+			|x, y| => Term::val(int(&x)-int(&y))
 		);
 
 		let one = builtin!(
 			N
-			| | => Term::val(1)
+			| | => Term::val(1i32)
 		);
 
 		let two = builtin!(
 			N
-			| | => Term::val(2)
+			| | => Term::val(2i32)
 		);
 
 		context! { lte, plus, minus, one, two}

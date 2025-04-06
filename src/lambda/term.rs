@@ -86,7 +86,13 @@ impl Term {
 		}
 	}
 
-	pub fn get<T: TermValue + Clone>(&self) -> Option<T> {
+	pub fn get<T: TermValue + Clone>(&self) -> T {
+		let rc = self.leaf_val().unwrap();
+		let any = rc.as_any();
+		any.downcast_ref::<T>().unwrap().clone()
+	}
+
+	pub fn try_get<T: TermValue + Clone>(&self) -> Option<T> {
 		let rc = self.leaf_val()?;
 		let any = rc.as_any();
 		let out = any.downcast_ref::<T>()?;

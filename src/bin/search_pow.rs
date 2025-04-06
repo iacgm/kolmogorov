@@ -38,7 +38,7 @@ fn main() {
 
 				total_time += end.duration_since(start).as_secs_f32();
 
-				let output = output.get::<i32>().unwrap();
+				let output = output.get::<i32>();
 
 				if output != expected {
 					continue 'search;
