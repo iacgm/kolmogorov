@@ -1,7 +1,7 @@
 use kolmogorov::*;
 
-mod contexts;
-use contexts::*;
+mod languages;
+use languages::*;
 
 use std::time::Instant;
 
@@ -10,10 +10,9 @@ fn pow(n: i32) -> i32 {
 }
 
 fn main() {
-	let lang = Box::new(Polynomials);
+	let lang = Polynomials;
 	let ctxt = lang.context();
 
-	use Term::*;
 	let targ = ty!(N => N => N);
 
 	let example = term!(p n -> mult p (plus one one));
@@ -24,13 +23,13 @@ fn main() {
 	for size in 1.. {
 		println!("Time: {}", total_time);
 		println!("Searching size {}:", size);
-		'search: for (term, _) in search(lang.clone(), vec![], &targ, size) {
+		'search: for (term, _) in search(&lang, vec![], &targ, size) {
 			for n in 1..5 {
 				let prev = pow(n - 1);
 				let expected = pow(n);
 
 				let program = term! {
-					[term] [Val(prev)] [Val(n)]
+					[term] [:prev] [:n]
 				};
 
 				let start = Instant::now();
@@ -39,7 +38,7 @@ fn main() {
 
 				total_time += end.duration_since(start).as_secs_f32();
 
-				let output = output.int().unwrap();
+				let output = output.get::<i32>().unwrap();
 
 				if output != expected {
 					continue 'search;

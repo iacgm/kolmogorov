@@ -3,8 +3,8 @@ use std::rc::Rc;
 
 use kolmogorov::{metro::metropolis, *};
 
-mod fib_lang;
-use fib_lang::*;
+mod languages;
+use languages::*;
 
 fn main() {
 	let lang = FibLang;
@@ -20,16 +20,15 @@ fn main() {
 	let fibs: Rc<Vec<i32>> = Rc::new((0..num_examples).map(fib).collect());
 	let prevs: Vec<(Identifier, BuiltIn)> = (0..num_examples)
 		.map(|n| {
-			use Term::*;
 			let fibs2 = fibs.clone();
 			let def = builtin! {
 				N => N
 				|c| => {
-					let c = c.int()?;
+					let c = c.get::<i32>()?;
 					if 0 < c && c < n {
-						Val(fibs2[c as usize])
+						Term::val(fibs2[c as usize])
 					} else {
-						Val(0)
+						Term::val(0)
 					}
 				}
 			};
@@ -57,12 +56,12 @@ fn main() {
 			let rec_arg = prevs[n as usize].0;
 
 			let program = term! {
-				[t] [Var(rec_arg)] [Val(n)]
+				[t] [Var(rec_arg)] [:n]
 			};
 
 			let evaled = exec_ctxt.evaluate(&program);
 
-			let output = evaled.int().unwrap();
+			let output = evaled.get::<i32>().unwrap();
 
 			if output == f_n {
 				num_correct += 1;
@@ -91,7 +90,7 @@ fn main() {
 
 	let iterations = 150_000;
 
-	let metropolis_search = metropolis(&lang, &start, &ty, scorer, iterations);
+	let (_, metropolis_search) = metropolis(&lang, &start, &ty, scorer, iterations);
 
 	println!("Best Found: {}", &metropolis_search);
 	println!("Semantics:  {}", lang.analyze(&metropolis_search));

@@ -1,15 +1,14 @@
-
 use kolmogorov::*;
 
-mod polynomials;
-use polynomials::*;
+mod languages;
+use languages::*;
 
 fn main() {
-	let lang = PolynomialLanguage;
+	let lang = Opaque;
 
 	let ty = ty!(N => N);
 
-	for n in 1.. {
+	for n in 8..=8 {
 		println!("Round {}", n);
 		let start = std::time::Instant::now();
 

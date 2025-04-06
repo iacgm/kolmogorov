@@ -1,7 +1,7 @@
 use kolmogorov::{metro::metropolis, *};
 
-mod opaque;
-use opaque::*;
+mod languages;
+use languages::*;
 
 fn main() {
 	let lang = Opaque;
@@ -13,18 +13,17 @@ fn main() {
 	const TUNING_PARAM: f64 = 0.5;
 
 	let scorer = |t: &Term| {
-		use Term::*;
 		let max_correct = examples.len() as f64;
 
 		let mut num_correct = max_correct;
 		for (x, y) in examples.iter().copied() {
 			let program = term! {
-				[t] [Val(x)]
+				[t] [:x]
 			};
 
 			let evaled = lang_ctxt.evaluate(&program);
 
-			let output = evaled.int().unwrap();
+			let output = evaled.get::<i32>().unwrap();
 
 			if output != y {
 				num_correct -= 1.;
@@ -44,7 +43,7 @@ fn main() {
 
 	let iterations = 50_000;
 
-	let metropolis_search = metropolis(&lang, &start, &ty, scorer, iterations);
+	let (_, metropolis_search) = metropolis(&lang, &start, &ty, scorer, iterations);
 
 	println!("Best Found: {}", metropolis_search);
 }

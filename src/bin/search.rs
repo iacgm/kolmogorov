@@ -1,17 +1,16 @@
 use kolmogorov::*;
 
-mod opaque;
-use opaque::*;
+mod languages;
+use languages::*;
 
 fn main() {
-	let lang = Opaque;
-
-	let ty = ty!(N);
+	let lang = Polynomials;
+	let ty = ty!(N => N);
 
 	for n in 1.. {
 		let start = std::time::Instant::now();
 
-		let searcher = search::search(&lang, vec![("var", Type::Int.into())], &ty, n);
+		let searcher = search::search(&lang, vec![], &ty, n);
 
 		let count = searcher.count();
 

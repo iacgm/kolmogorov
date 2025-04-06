@@ -1,18 +1,19 @@
+
 use kolmogorov::*;
 
-mod opaque;
-use opaque::*;
+mod languages;
+use languages::*;
 
 fn main() {
-	let lang = Opaque;
+	let lang = Polynomials;
 
 	let ty = ty!(N => N);
 
-	for n in 8..=8 {
+	for n in 1.. {
 		println!("Round {}", n);
 		let start = std::time::Instant::now();
 
-		let searcher = search(Box::new(lang.clone()), vec![], &ty, n);
+		let searcher = search(&lang, vec![], &ty, n);
 
 		let mut count = 0;
 

@@ -1,10 +1,10 @@
 use kolmogorov::*;
 
-mod polynomials;
-use polynomials::*;
+mod languages;
+use languages::*;
 
 fn main() {
-	let lang = PolynomialLanguage;
+	let lang = Polynomials;
 
 	let num_examples = 10;
 

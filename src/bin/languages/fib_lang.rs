@@ -7,11 +7,11 @@ impl Language for FibLang {
 	type Semantics = OpaqueSemantics;
 
 	fn context(&self) -> Context {
-		use Term::*;
+		let int = |t: &Term| t.get::<i32>();
 
 		let lte = builtin!(
 			N => N => N => N => N
-			|a, b| => if a.int()? <= b.int()? {
+			|a, b| => if int(&a)? <= int(&b)? {
 				term!(a b -> a)
 			} else {
 				term!(a b -> b)
@@ -20,22 +20,22 @@ impl Language for FibLang {
 
 		let plus = builtin!(
 			N => N => N
-			|x, y| => Val(x.int()?+y.int()?)
+			|x, y| => Term::val(int(&x)?+int(&y)?)
 		);
 
 		let minus = builtin!(
 			N => N => N
-			|x, y| => Val(x.int()?-y.int()?)
+			|x, y| => Term::val(int(&x)?-int(&y)?)
 		);
 
 		let one = builtin!(
 			N
-			| | => Val(1)
+			| | => Term::val(1)
 		);
 
 		let two = builtin!(
 			N
-			| | => Val(2)
+			| | => Term::val(2)
 		);
 
 		context! { lte, plus, minus, one, two}

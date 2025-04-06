@@ -4,7 +4,7 @@ use std::rc::Rc;
 use kolmogorov::*;
 
 #[derive(Clone, Copy)]
-pub struct PolynomialLanguage;
+pub struct Polynomials;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct PolySem(Vec<Identifier>, Sum); // Last arg is first to be applied. (outermost last)
@@ -16,7 +16,7 @@ struct Sum(i32, Vec<Product>);
 struct Product(i32, Vec<Identifier>);
 
 use Analysis::*;
-impl Language for PolynomialLanguage {
+impl Language for Polynomials {
 	type Semantics = PolySem;
 
 	const SMALL_SIZE: usize = 10;
