@@ -6,10 +6,10 @@ use languages::*;
 use utils::*;
 
 fn main() -> std::io::Result<()> {
-    let lang = Polynomials;
+    let lang = CondPolyLang;
     let oeis = oeis::load_oeis()?;
 
-    let mut output_file = std::fs::File::create("data/oeis_individual")?;
+    let mut output_file = std::fs::File::create("data/pure_iter_rich")?;
 
     println!("{} sequences:", oeis.len());
 
@@ -19,15 +19,17 @@ fn main() -> std::io::Result<()> {
     for id in keys {
         let nums = &oeis[id];
 
-        let examples = nums.iter().cloned().enumerate().map(|(i, n)| (i as i32, n));
+        let examples = nums[1..].iter().cloned();
 
-        let output = simple_map(
+        let output = pure_iterative(
             lang,
+            nums[0],
             examples,
-            term!(n -> n),
-            ty!(N => N),
+            term!(n -> eval (orelse n)),
+            ty!(Poly => N),
             SynthesisParameters {
                 bias: SizeBias::DistAbs { mean: 20, c: 0.5 },
+                iterations: 75_000,
                 ..Default::default()
             },
             Options { print_freq: None },
@@ -39,7 +41,10 @@ fn main() -> std::io::Result<()> {
             let term = output.term;
             let analysis = lang.analyze(&term);
 
-            let text = format!("Solution found for A{:06}: {} (≈ {})", id, term, analysis);
+            let text = format!(
+                "Solution found for A{:06}: {} (≈ {})",
+                id, term, analysis
+            );
 
             println!("{}", text);
             writeln!(output_file, "{}", text)?;

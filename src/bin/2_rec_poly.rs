@@ -9,7 +9,7 @@ fn main() -> std::io::Result<()> {
     let lang = Polynomials;
     let oeis = oeis::load_oeis()?;
 
-    let mut output_file = std::fs::File::create("data/oeis_individual")?;
+    let mut output_file = std::fs::File::create("data/2_rec_poly")?;
 
     println!("{} sequences:", oeis.len());
 
@@ -19,15 +19,15 @@ fn main() -> std::io::Result<()> {
     for id in keys {
         let nums = &oeis[id];
 
-        let examples = nums.iter().cloned().enumerate().map(|(i, n)| (i as i32, n));
-
-        let output = simple_map(
+        let output = k_rec::<Polynomials, i32>(
             lang,
-            examples,
-            term!(n -> n),
-            ty!(N => N),
+            2,
+            nums.iter().cloned(),
+            term!(a b -> plus a b),
+            ty!(N => N => N),
             SynthesisParameters {
                 bias: SizeBias::DistAbs { mean: 20, c: 0.5 },
+                iterations: 50_000,
                 ..Default::default()
             },
             Options { print_freq: None },
@@ -39,7 +39,10 @@ fn main() -> std::io::Result<()> {
             let term = output.term;
             let analysis = lang.analyze(&term);
 
-            let text = format!("Solution found for A{:06}: {} (≈ {})", id, term, analysis);
+            let text = format!(
+                "Solution found for A{:06}: {} (≈ {})",
+                id, term, analysis
+            );
 
             println!("{}", text);
             writeln!(output_file, "{}", text)?;

@@ -1,9 +1,11 @@
 #![allow(unused_imports)]
 
-mod polynomials;
+mod cond_poly;
 mod fib_lang;
 mod opaque;
+mod polynomials;
 
-pub use polynomials::*;
+pub use cond_poly::*;
 pub use fib_lang::*;
 pub use opaque::*;
+pub use polynomials::*;

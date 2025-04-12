@@ -1,6 +1,6 @@
 pub mod metro;
-mod utils;
 mod synth;
+mod utils;
 
 pub use metro::*;
 pub use synth::*;

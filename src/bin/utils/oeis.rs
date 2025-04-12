@@ -1,6 +1,6 @@
 use rustc_hash::FxHashMap as HashMap;
 
-const MIN_EXAMPLE_COUNT: usize = 30;
+const MIN_EXAMPLE_COUNT: usize = 10;
 
 pub type OEISMap = HashMap<usize, Vec<i32>>;
 
@@ -11,7 +11,7 @@ pub fn load_oeis() -> std::io::Result<OEISMap> {
 
 	let file = std::fs::read_to_string(FILENAME)?;
 
-	'lines: for line in file.lines() {
+	for line in file.lines() {
 		let mut words = line.trim().split(",");
 
 		let name = words.next().unwrap().trim();
@@ -26,14 +26,14 @@ pub fn load_oeis() -> std::io::Result<OEISMap> {
 			}
 
 			let Ok(n) = word.parse::<i32>() else {
-				continue 'lines;
+				break;
 			};
 
 			nums.push(n)
 		}
 
 		if nums.len() < MIN_EXAMPLE_COUNT {
-			continue 'lines;
+			continue;
 		}
 
 		map.insert(id, nums);

@@ -4,11 +4,12 @@ mod languages;
 use languages::*;
 
 fn main() {
-	let lang = Polynomials;
+    let lang = CondPolyLang;
 
-	let term = term!(f -> plus(one)(f));
+    let term = term!(n -> eval (orelse n));
 
-	let analysis = lang.analyze(&term);
+    let analysis = lang.analyze(&term);
 
-	println!("{}\n ≈ {}", term, analysis);
+    println!("Size: {}", term.size());
+    println!("{}\n ≈ {}", term, analysis);
 }
