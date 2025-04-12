@@ -13,13 +13,13 @@ pub struct Cond {
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub struct Program {
-    args: Vec<Identifier>,
     cases: Vec<(Cond, Sum)>,
     default: Sum,
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub enum CondPolySems {
+    Func(Identifier, Box<CondPolySems>),
     Case(Cond),
     Poly(Sum),
     Prog(Program),
@@ -100,7 +100,7 @@ impl Language for CondPolyLang {
             ("(*)".into(), mult),
             ("'1'".into(), one),
             ("'0'".into(), zero),
-            ("if".into(), case),
+            ("case".into(), case),
             ("eval".into(), eval),
             ("orelse".into(), orelse),
             ("eqz".into(), eqz),
@@ -119,7 +119,7 @@ impl Language for CondPolyLang {
         use CondPolySems::*;
 
         let names = [
-            "(+)", "(-)", "(*)", "'1'", "'0'", "if", "eval", "orelse", "eqz",
+            "(+)", "(-)", "(*)", "'1'", "'0'", "case", "eval", "orelse", "eqz",
             "pos", "and", "def",
         ];
 
@@ -131,21 +131,15 @@ impl Language for CondPolyLang {
         }
     }
 
-    fn slam(
-        &self,
-        ident: Identifier,
-        mut body: Analysis<Self>,
-    ) -> Analysis<Self> {
+    fn slam(&self, ident: Identifier, body: Analysis<Self>) -> Analysis<Self> {
         use Analysis::*;
         use CondPolySems::*;
 
-        let Canonical(Prog(Program { args, .. })) = &mut body else {
+        let Canonical(body) = body else {
             unreachable!()
         };
 
-        args.push(ident);
-
-        body
+        Canonical(Func(ident, body.into()))
     }
 
     fn sapp(&self, fun: Analysis<Self>, arg: Analysis<Self>) -> Analysis<Self> {
@@ -205,32 +199,20 @@ impl Language for CondPolyLang {
                 let Poly(p) = arg else { unreachable!() };
 
                 Canonical(Prog(Program {
-                    args: vec![],
                     cases: vec![],
                     default: p,
                 }))
             }
             Appl(v, mut args) if v.as_str() == "case" && args.len() == 2 => {
-                let (
-                    Prog(Program {
-                        args,
-                        mut cases,
-                        default,
-                    }),
-                    Poly(p),
-                    Case(c),
-                ) = (arg, args.pop().unwrap(), args.pop().unwrap())
+                let (Prog(Program { mut cases, default }), Poly(p), Case(c)) =
+                    (arg, args.pop().unwrap(), args.pop().unwrap())
                 else {
                     unreachable!()
                 };
 
                 cases.push((c, p));
 
-                Canonical(Prog(Program {
-                    args,
-                    cases,
-                    default,
-                }))
+                Canonical(Prog(Program { cases, default }))
             }
             Appl(v, mut args) if v.as_str() == "and" && args.len() == 1 => {
                 let (
@@ -259,19 +241,20 @@ impl Language for CondPolyLang {
                 }))
             }
             Appl(v, mut args) if v.as_str() == "def" && args.len() == 1 => {
+                let Func(ident, body) = arg else {
+                    unreachable!()
+                };
+
                 let (
                     Prog(Program {
-                        mut args,
                         mut cases,
                         mut default,
                     }),
                     Poly(p),
-                ) = (arg, args.pop().unwrap())
+                ) = (*body, args.pop().unwrap())
                 else {
                     unreachable!()
                 };
-
-                let ident = args.pop().unwrap();
 
                 for (case, poly) in &mut cases {
                     for eq in &mut case.eqzs {
@@ -285,17 +268,16 @@ impl Language for CondPolyLang {
 
                 default = default.sub(ident, p);
 
-                Canonical(Prog(Program {
-                    args,
-                    cases,
-                    default,
-                }))
+                Canonical(Prog(Program { cases, default }))
             }
             Appl(v, mut args) if args.is_empty() => {
                 args.push(arg);
                 Canonical(Appl(v, args))
             }
-            _ => unreachable!(),
+            _ => {
+                dbg!(fun);
+                unreachable!()
+            }
         }
     }
 }

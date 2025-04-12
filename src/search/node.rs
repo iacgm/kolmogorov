@@ -187,6 +187,7 @@ impl<L: Language> Node<L> {
                         return match curr_state.next(search_ctxt) {
                             Some((term, analysis)) => {
                                 let term = Term::Lam(ident, term.into());
+
                                 let analysis =
                                     search_ctxt.lang.slam(ident, analysis);
                                 Some((term, analysis))

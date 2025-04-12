@@ -119,8 +119,6 @@ fn mutate<L: Language>(
             Some((candidate, 1.))
         }
         Small => {
-            println!(">{}", term);
-
             let (replacement_node, annotation, _) =
                 random_subnode(&ctxt, term, ty, 2, L::SMALL_SIZE);
 
