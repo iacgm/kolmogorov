@@ -2,42 +2,92 @@ use rustc_hash::FxHashMap as HashMap;
 
 const MIN_EXAMPLE_COUNT: usize = 10;
 
-pub type OEISMap = HashMap<usize, Vec<i32>>;
+#[derive(Default)]
+pub struct OEISMap {
+    pub seq: HashMap<usize, Vec<i32>>,
+    pub kws: HashMap<usize, Vec<String>>,
+}
 
-pub fn load_oeis() -> std::io::Result<OEISMap> {
-	const FILENAME: &str = "data/stripped";
+pub struct OEISLoadOptions {
+    pub required: Vec<&'static str>,
+    pub disallow: Vec<&'static str>,
+}
 
-	let mut map = OEISMap::default();
+impl Default for OEISLoadOptions {
+    fn default() -> Self {
+        Self {
+            required: vec!["nice", "easy", "core"],
+            disallow: vec![
+                "base", "bref", "cofr", "cons", "dumb", "fini", "full", "hard",
+                "obsc", "word", "dupe",
+            ],
+        }
+    }
+}
 
-	let file = std::fs::read_to_string(FILENAME)?;
+pub fn load_oeis_def() -> std::io::Result<OEISMap> {
+    load_oeis(&Default::default())
+}
 
-	for line in file.lines() {
-		let mut words = line.trim().split(",");
+pub fn load_oeis(options: &OEISLoadOptions) -> std::io::Result<OEISMap> {
+    const SEQS_FILE: &str = "data/stripped";
+    const KEYS_FILE: &str = "data/keywords";
 
-		let name = words.next().unwrap().trim();
-		let id = name[1..].parse::<usize>().unwrap();
+    let mut map = OEISMap::default();
 
-		let mut nums = vec![];
+    let keys_file = std::fs::read_to_string(KEYS_FILE)?;
 
-		for word in words {
-			if word.is_empty() {
-				// Since each line ends in a comma
-				continue;
-			}
+    for line in keys_file.lines() {
+        let name = &line[1..=6];
 
-			let Ok(n) = word.parse::<i32>() else {
-				break;
-			};
+        let id = name.parse::<usize>().unwrap();
 
-			nums.push(n)
-		}
+        let kws = line[8..].split(",").map(String::from).collect::<Vec<_>>();
 
-		if nums.len() < MIN_EXAMPLE_COUNT {
-			continue;
-		}
+        // .contains does not work for String/&str comparison
+        let is_kw = |r| kws.iter().any(|s| s == r);
 
-		map.insert(id, nums);
-	}
+        if options.required.iter().all(is_kw)
+            && !options.disallow.iter().any(is_kw)
+        {
+            map.kws.insert(id, kws);
+        }
+    }
+    drop(keys_file);
 
-	Ok(map)
+    let seqs_file = std::fs::read_to_string(SEQS_FILE)?;
+    for line in seqs_file.lines() {
+        let mut words = line.trim().split(",");
+
+        let name = words.next().unwrap().trim();
+
+        let id = name[1..].parse::<usize>().unwrap();
+
+        if !map.kws.contains_key(&id) {
+            continue;
+        }
+
+        let mut nums = vec![];
+
+        for word in words {
+            if word.is_empty() {
+                // Since each line ends in a comma
+                continue;
+            }
+
+            let Ok(n) = word.parse::<i32>() else {
+                break;
+            };
+
+            nums.push(n)
+        }
+
+        if nums.len() < MIN_EXAMPLE_COUNT {
+            continue;
+        }
+
+        map.seq.insert(id, nums);
+    }
+
+    Ok(map)
 }

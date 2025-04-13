@@ -29,6 +29,9 @@ pub enum CondPolySems {
 impl Language for CondPolyLang {
     type Semantics = CondPolySems;
 
+    const SMALL_SIZE: usize = 10;
+    const LARGE_SIZE: usize = 20;
+
     fn context(&self) -> Context {
         let plus = builtin!(
             Poly => Poly => Poly
@@ -270,12 +273,11 @@ impl Language for CondPolyLang {
 
                 Canonical(Prog(Program { cases, default }))
             }
-            Appl(v, mut args) if args.is_empty() => {
+            Appl(v, mut args) => {
                 args.push(arg);
                 Canonical(Appl(v, args))
             }
             _ => {
-                dbg!(fun);
                 unreachable!()
             }
         }
@@ -284,6 +286,40 @@ impl Language for CondPolyLang {
 
 impl std::fmt::Display for CondPolySems {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self)
+        use CondPolySems::*;
+
+        match self {
+            Func(_, _) => {
+                let mut next = self;
+                while let Func(v, body) = next {
+                    next = body;
+                    write!(f, "{} ", v)?;
+                }
+                write!(f, "-> {}", next)
+            }
+            Case(cond) => {
+                write!(f, "{}", cond)
+            }
+            Poly(sum) => write!(f, "{}", sum),
+            Prog(program) => {
+                for (cond, poly) in &program.cases {
+                    write!(f, "({})=>{};", cond, poly)?;
+                }
+                write!(f, "else=>{}", program.default)
+            }
+            Appl(identifier, items) => {
+                write!(f, "{}", identifier)?;
+                for item in items {
+                    write!(f, "({})", item)?
+                }
+                Ok(())
+            }
+        }
+    }
+}
+
+impl std::fmt::Display for Cond {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "0={:?} && 0<{:?}", self.eqzs, self.poss)
     }
 }

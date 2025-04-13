@@ -6,18 +6,18 @@ use languages::*;
 use utils::*;
 
 fn main() -> std::io::Result<()> {
-    let lang = Polynomials;
-    let oeis = oeis::load_oeis()?;
+    let lang = CondPolyLang;
+    let oeis = oeis::load_oeis_def()?;
 
-    let mut output_file = std::fs::File::create("data/oeis_pure_iterative")?;
+    let mut output_file = std::fs::File::create("data/oeis_pure_iterative_x")?;
 
-    println!("{} sequences:", oeis.len());
+    println!("{} sequences:", oeis.seq.len());
 
-    let mut keys = oeis.keys().collect::<Vec<_>>();
+    let mut keys = oeis.seq.keys().collect::<Vec<_>>();
     keys.sort();
 
     for id in keys {
-        let nums = &oeis[id];
+        let nums = &oeis.seq[id];
 
         let examples = nums[1..].iter().cloned();
 
@@ -28,8 +28,8 @@ fn main() -> std::io::Result<()> {
             term!(n -> n),
             ty!(N => N),
             SynthesisParameters {
-                bias: SizeBias::DistAbs { mean: 20, c: 0.5 },
-                iterations: 75_000,
+                bias: SizeBias::DistAbs { mean: 30, c: 0.5 },
+                iterations: 100_000,
                 ..Default::default()
             },
             Options { print_freq: None },

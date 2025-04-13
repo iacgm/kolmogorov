@@ -3,7 +3,7 @@ pub fn pure_iterative<L, O>(
     lang: L,
     seed: O,
     examples: impl Iterator<Item = O>,
-    start: Term,
+    start: Option<Term>,
     ty: Type,
     settings: SynthesisParameters,
     options: Options,
@@ -13,6 +13,15 @@ where
     O: TermValue + Clone,
 {
     let seed_term = Term::val(seed);
+
+    // If no start term is provided, construct shortest one.
+    let start = start.unwrap_or_else(|| {
+        (1..)
+            .flat_map(|size| search(&lang, vec![], &ty, size))
+            .next()
+            .unwrap()
+            .0
+    });
 
     let examples = examples.map(std::rc::Rc::new).collect::<Vec<_>>();
 

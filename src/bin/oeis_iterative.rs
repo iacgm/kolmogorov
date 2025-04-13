@@ -7,17 +7,17 @@ use utils::*;
 
 fn main() -> std::io::Result<()> {
     let lang = Polynomials;
-    let oeis = oeis::load_oeis()?;
+    let oeis = oeis::load_oeis_def()?;
 
     let mut output_file = std::fs::File::create("data/oeis_iterative")?;
 
-    println!("{} sequences:", oeis.len());
+    println!("{} sequences:", oeis.seq.len());
 
-    let mut keys = oeis.keys().collect::<Vec<_>>();
+    let mut keys = oeis.seq.keys().collect::<Vec<_>>();
     keys.sort();
 
     for id in keys {
-        let nums = &oeis[id];
+        let nums = &oeis.seq[id];
 
         let examples = nums[1..]
             .iter()

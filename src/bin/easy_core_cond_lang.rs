@@ -9,7 +9,7 @@ fn main() -> std::io::Result<()> {
     let lang = CondPolyLang;
     let oeis = oeis::load_oeis_def()?;
 
-    let mut output_file = std::fs::File::create("data/pure_iter_rich")?;
+    let mut output_file = std::fs::File::create("data/oeis_pure_iterative_x")?;
 
     println!("{} sequences:", oeis.seq.len());
 
@@ -19,17 +19,19 @@ fn main() -> std::io::Result<()> {
     for id in keys {
         let nums = &oeis.seq[id];
 
+        println!("A{:06}: {:?}", id, nums);
+
         let examples = nums[1..].iter().cloned();
 
         let output = pure_iterative(
             lang,
             nums[0],
             examples,
-            term!(n -> eval (orelse n)),
+            None,
             ty!(Poly => N),
             SynthesisParameters {
-                bias: SizeBias::DistAbs { mean: 20, c: 0.5 },
-                iterations: 75_000,
+                bias: SizeBias::DistAbs { mean: 30, c: 0.5 },
+                iterations: 100_000,
                 ..Default::default()
             },
             Options { print_freq: None },
@@ -50,6 +52,8 @@ fn main() -> std::io::Result<()> {
             writeln!(output_file, "{}", text)?;
             output_file.flush()?;
         }
+
+        println!()
     }
 
     Ok(())
