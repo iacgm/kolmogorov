@@ -6,7 +6,7 @@ use languages::*;
 use utils::*;
 
 fn main() -> std::io::Result<()> {
-    let lang = Polynomials;
+    let lang = LogicLang::new(1);
     let oeis = oeis::load_oeis_def()?;
 
     let mut output_file = std::fs::File::create("data/oeis_individual")?;
@@ -23,10 +23,10 @@ fn main() -> std::io::Result<()> {
             nums.iter().cloned().enumerate().map(|(i, n)| (i as i32, n));
 
         let output = simple_map(
-            lang,
+            lang.clone(),
             examples,
             None,
-            ty!(N => N),
+            ty!(N => Bool),
             SynthesisParameters {
                 bias: SizeBias::DistAbs { mean: 20, c: 0.5 },
                 ..Default::default()

@@ -46,7 +46,7 @@ impl VarGen {
     }
 
     pub fn find_with(&mut self, p: impl Fn(&char) -> bool) -> Identifier {
-        let p = |s: &Identifier| p(&s.str().chars().next().unwrap());
+        let p = |s: &Identifier| p(&s.as_str().chars().next().unwrap());
         let var = self.free.iter().copied().find(p).unwrap();
         self.free.take(&var).unwrap()
     }
@@ -119,14 +119,5 @@ impl From<&'static str> for Identifier {
 impl From<u128> for Identifier {
     fn from(u: u128) -> Self {
         Self::Uuid(u)
-    }
-}
-
-impl Identifier {
-    pub fn str(&self) -> &'static str {
-        match self {
-            Self::Name(s) => s,
-            _ => unimplemented!(),
-        }
     }
 }

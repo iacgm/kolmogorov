@@ -56,7 +56,7 @@ macro_rules! builtin {
 			let $captured = $captured.clone();
 		)+)?
 
-		let func = Rc::new(move |_args: &[Thunk]| {
+		let func = Rc::new(move |_ctxt: &Context, _args: &[Thunk]| {
 			let rev_list!([$($arg),*]) = &_args[..] else {
 				unreachable!()
 			};
@@ -80,9 +80,9 @@ macro_rules! builtin {
 macro_rules! context {
 	{$($def:ident),*} => {{
 		Context::new(
-			&[$(
+			[$(
 				($crate::Identifier::Name(stringify!($def)), $def.clone())
-			),*],
+			),*].into_iter(),
 		)
 	}};
 }

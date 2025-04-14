@@ -12,9 +12,9 @@ pub struct Context {
 }
 
 impl Context {
-    pub fn new(defs: &[(Identifier, BuiltIn)]) -> Self {
+    pub fn new(defs: impl Iterator<Item = (Identifier, BuiltIn)>) -> Self {
         Self {
-            defs: HashMap::from_iter(defs.iter().cloned()),
+            defs: HashMap::from_iter(defs),
         }
     }
 
@@ -83,7 +83,7 @@ impl Context {
                     func, n_args: 0, ..
                 }) = self.get(*v)
                 {
-                    *term = func(&mut []).unwrap();
+                    *term = func(self, &mut []).unwrap();
                     drop(borrow);
                     self.evaluate_thunk(thunk)
                 }
@@ -110,7 +110,7 @@ impl Context {
                 Some(BuiltIn {
                     func, n_args: 0, ..
                 }) => {
-                    *root = func(&mut []).unwrap();
+                    *root = func(self, &mut []).unwrap();
                     self.collapse_spine(root, depth)
                 }
                 Some(blt) if blt.n_args <= depth => {
@@ -136,7 +136,7 @@ impl Context {
 
                             let func = &*builtin.func;
 
-                            if let Some(term) = func(&mut args[..]) {
+                            if let Some(term) = func(self, &mut args[..]) {
                                 *root = term;
                                 return self.collapse_spine(root, depth);
                             }

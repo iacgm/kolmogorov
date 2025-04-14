@@ -97,20 +97,23 @@ impl Language for CondPolyLang {
             |p, f| => term!([f] [p])
         );
 
-        Context::new(&[
-            ("(+)".into(), plus),
-            ("(-)".into(), sub),
-            ("(*)".into(), mult),
-            ("'1'".into(), one),
-            ("'0'".into(), zero),
-            ("case".into(), case),
-            ("eval".into(), eval),
-            ("orelse".into(), orelse),
-            ("eqz".into(), eqz),
-            ("pos".into(), pos),
-            ("and".into(), and),
-            ("def".into(), def),
-        ])
+        Context::new(
+            [
+                ("(+)".into(), plus),
+                ("(-)".into(), sub),
+                ("(*)".into(), mult),
+                ("'1'".into(), one),
+                ("'0'".into(), zero),
+                ("case".into(), case),
+                ("eval".into(), eval),
+                ("orelse".into(), orelse),
+                ("eqz".into(), eqz),
+                ("pos".into(), pos),
+                ("and".into(), and),
+                ("def".into(), def),
+            ]
+            .into_iter(),
+        )
     }
 
     fn sval(&self, _: &std::rc::Rc<dyn TermValue>) -> Analysis<Self> {

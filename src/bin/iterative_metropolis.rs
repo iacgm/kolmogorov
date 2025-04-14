@@ -19,7 +19,7 @@ fn main() {
         lang,
         nums[0],
         examples,
-        term!(n i -> n),
+        None,
         ty!(N => N => N),
         SynthesisParameters {
             bias: SizeBias::DistAbs { mean: 20, c: 0.5 },

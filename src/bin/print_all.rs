@@ -4,11 +4,12 @@ mod languages;
 use languages::*;
 
 fn main() {
-    let lang = CondPolyLang;
+    let lang = Empty;
 
-    let ty = ty!(Poly => N);
+    // Exam Q 3(d) from Lambda Calculus & Types 2024 Exam Paper
+    let ty = ty!((((A => B) => B) => B) => A => B);
 
-    for n in 6..=6 {
+    for n in 1.. {
         println!("Round {}", n);
         let start = std::time::Instant::now();
 

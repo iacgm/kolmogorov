@@ -25,7 +25,7 @@ fn main() -> std::io::Result<()> {
             lang,
             nums[0],
             examples,
-            term!(n -> n),
+            None,
             ty!(N => N),
             SynthesisParameters {
                 bias: SizeBias::DistAbs { mean: 30, c: 0.5 },

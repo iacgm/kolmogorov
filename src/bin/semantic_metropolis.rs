@@ -11,7 +11,7 @@ fn main() {
     let output = simple_map(
         lang,
         (0..num_examples).map(|n| (n, 4 * n * n * n + n * n)),
-        term!(n -> n),
+        None,
         ty!(N => N),
         SynthesisParameters {
             bias: SizeBias::DistAbs { mean: 20, c: 0.5 },

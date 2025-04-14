@@ -3,7 +3,7 @@ pub fn iterative<L, I, O>(
     lang: L,
     seed: O,
     examples: impl Iterator<Item = (I, O)>,
-    start: Term,
+    start: Option<Term>,
     ty: Type,
     settings: SynthesisParameters,
     options: Options,
@@ -13,6 +13,14 @@ where
     I: TermValue + Clone,
     O: TermValue + Clone,
 {
+    let start = start.unwrap_or_else(|| {
+        (1..)
+            .flat_map(|size| search(&lang, vec![], &ty, size))
+            .next()
+            .unwrap()
+            .0
+    });
+
     let seed_term = Term::val(seed);
 
     let examples = examples

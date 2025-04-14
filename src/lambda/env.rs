@@ -1,7 +1,7 @@
 use super::*;
 use std::rc::Rc;
 
-type BuiltInFunc = Rc<dyn Fn(&[Thunk]) -> Option<Term>>;
+type BuiltInFunc = Rc<dyn Fn(&Context, &[Thunk]) -> Option<Term>>;
 
 #[derive(Clone)]
 pub struct BuiltIn {

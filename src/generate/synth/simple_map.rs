@@ -2,7 +2,7 @@ use super::*;
 pub fn simple_map<L, I, O>(
     lang: L,
     examples: impl Iterator<Item = (I, O)>,
-    start: Term,
+    start: Option<Term>,
     ty: Type,
     settings: SynthesisParameters,
     options: Options,
@@ -12,6 +12,14 @@ where
     I: TermValue + Clone,
     O: TermValue + Clone,
 {
+    let start = start.unwrap_or_else(|| {
+        (1..)
+            .flat_map(|size| search(&lang, vec![], &ty, size))
+            .next()
+            .unwrap()
+            .0
+    });
+
     let examples = examples.map(|(i, o)| (Term::val(i), o)).collect::<Vec<_>>();
 
     let num_examples = examples.len();
