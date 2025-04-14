@@ -86,6 +86,7 @@ impl MetropolisOutput {
         } = self;
 
         println!("Best Found: {}", &term);
+        println!("Size: {}", term.size());
         println!("Semantics:  {}", lang.analyze(term));
 
         println!("Score: {:?} (or {:?} correct)", score, num_correct,);

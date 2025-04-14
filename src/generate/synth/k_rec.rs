@@ -5,7 +5,7 @@ pub fn k_rec<L, O>(
     lang: L,
     k: usize,
     examples: impl Iterator<Item = O>,
-    start: Term,
+    start: Option<Term>,
     ty: Type,
     settings: SynthesisParameters,
     options: Options,
@@ -14,6 +14,14 @@ where
     L: Language,
     O: TermValue + Clone,
 {
+    let start = start.unwrap_or_else(|| {
+        (1..)
+            .flat_map(|size| search(&lang, vec![], &ty, size))
+            .next()
+            .unwrap()
+            .0
+    });
+
     let mut seeds = examples.map(Term::val::<O>).collect::<Vec<_>>();
 
     let examples = seeds.split_off(k);

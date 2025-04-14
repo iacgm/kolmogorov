@@ -5,10 +5,11 @@ use kolmogorov::*;
 pub struct CondPolyLang;
 
 type Comparison = Sum;
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+#[derive(Default, Debug, Clone, Hash, PartialEq, Eq)]
 pub struct Cond {
     eqzs: Vec<Comparison>,
     poss: Vec<Comparison>,
+    divs: Vec<(Sum, Sum)>,
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
@@ -30,7 +31,7 @@ impl Language for CondPolyLang {
     type Semantics = CondPolySems;
 
     const SMALL_SIZE: usize = 10;
-    const LARGE_SIZE: usize = 20;
+    const LARGE_SIZE: usize = 16;
 
     fn context(&self) -> Context {
         let plus = builtin!(
@@ -87,14 +88,22 @@ impl Language for CondPolyLang {
             |p| => Term::val(p.get::<i32>() > 0)
         );
 
+        let div = builtin!(
+            Poly => Poly => Cond
+            |m, n| => {
+                let m = m.get::<i32>();
+                let n = n.get::<i32>();
+                if n != 0 {
+                    Term::val(m % n == 0)
+                } else {
+                    Term::val(-1)
+                }
+            }
+        );
+
         let and = builtin!(
             Cond => Cond => Cond
             |a, b| => Term::val(a.get::<bool>() && b.get::<bool>())
-        );
-
-        let def = builtin!(
-            Poly => (Poly => N) => N
-            |p, f| => term!([f] [p])
         );
 
         Context::new(&[
@@ -108,8 +117,8 @@ impl Language for CondPolyLang {
             ("orelse".into(), orelse),
             ("eqz".into(), eqz),
             ("pos".into(), pos),
+            ("div".into(), div),
             ("and".into(), and),
-            ("def".into(), def),
         ])
     }
 
@@ -123,7 +132,7 @@ impl Language for CondPolyLang {
 
         let names = [
             "(+)", "(-)", "(*)", "'1'", "'0'", "case", "eval", "orelse", "eqz",
-            "pos", "and", "def",
+            "pos", "div", "and",
         ];
 
         match v.as_str() {
@@ -185,12 +194,27 @@ impl Language for CondPolyLang {
                 let kind = match v.as_str() {
                     "eqz" => &mut eqzs,
                     "pos" => &mut poss,
+
                     _ => unreachable!(),
                 };
 
                 kind.push(p);
 
-                Canonical(Case(Cond { eqzs, poss }))
+                Canonical(Case(Cond {
+                    eqzs,
+                    poss,
+                    ..Default::default()
+                }))
+            }
+            Appl(v, mut args) if v.as_str() == "div" && args.len() == 1 => {
+                let (Poly(m), Poly(n)) = (args.remove(0), arg) else {
+                    unreachable!()
+                };
+
+                Canonical(Case(Cond {
+                    divs: vec![(m, n)],
+                    ..Default::default()
+                }))
             }
             Appl(v, args) if v.as_str() == "eval" => {
                 assert!(args.is_empty());
@@ -220,66 +244,35 @@ impl Language for CondPolyLang {
             Appl(v, mut args) if v.as_str() == "and" && args.len() == 1 => {
                 let (
                     Case(Cond {
-                        eqzs: mut es1,
-                        poss: mut ps1,
+                        mut eqzs,
+                        mut poss,
+                        mut divs,
                     }),
                     Case(Cond {
                         eqzs: es2,
                         poss: ps2,
+                        divs: ds2,
                     }),
                 ) = (arg, args.pop().unwrap())
                 else {
                     unreachable!()
                 };
 
-                es1.extend_from_slice(&es2);
-                ps1.extend_from_slice(&ps2);
+                eqzs.extend_from_slice(&es2);
+                poss.extend_from_slice(&ps2);
+                divs.extend_from_slice(&ds2);
 
-                es1.sort();
-                ps1.sort();
+                eqzs.sort();
+                poss.sort();
+                divs.sort();
 
-                Canonical(Case(Cond {
-                    eqzs: es1,
-                    poss: ps1,
-                }))
-            }
-            Appl(v, mut args) if v.as_str() == "def" && args.len() == 1 => {
-                let Func(ident, body) = arg else {
-                    unreachable!()
-                };
-
-                let (
-                    Prog(Program {
-                        mut cases,
-                        mut default,
-                    }),
-                    Poly(p),
-                ) = (*body, args.pop().unwrap())
-                else {
-                    unreachable!()
-                };
-
-                for (case, poly) in &mut cases {
-                    for eq in &mut case.eqzs {
-                        *eq = eq.sub(ident, p.clone());
-                    }
-                    for ps in &mut case.poss {
-                        *ps = ps.sub(ident, p.clone());
-                    }
-                    *poly = poly.sub(ident, p.clone());
-                }
-
-                default = default.sub(ident, p);
-
-                Canonical(Prog(Program { cases, default }))
+                Canonical(Case(Cond { eqzs, poss, divs }))
             }
             Appl(v, mut args) => {
                 args.push(arg);
                 Canonical(Appl(v, args))
             }
-            _ => {
-                unreachable!()
-            }
+            _ => Malformed,
         }
     }
 }

@@ -16,10 +16,10 @@ pub struct OEISLoadOptions {
 impl Default for OEISLoadOptions {
     fn default() -> Self {
         Self {
-            required: vec!["nice", "easy", "core"],
+            required: vec!["nice", "easy"],
             disallow: vec![
                 "base", "bref", "cofr", "cons", "dumb", "fini", "full", "hard",
-                "obsc", "word", "dupe",
+                "obsc", "word", "dupe", "dead", "frac", "tabf", "tabl", "unkn",
             ],
         }
     }
