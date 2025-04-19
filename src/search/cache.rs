@@ -90,7 +90,7 @@ impl<L: Language> Cache<L> {
 
                 let rest = core(dict, targ, ret, size - n - 1);
 
-                if arg_res.unknown() && !rest.empty() {
+                if arg_res.unknown() && !rest.empty() || arg_res.inhabited() && rest.unknown() {
                     res = Unknown;
                     continue;
                 }
@@ -187,7 +187,7 @@ impl<L: Language> Cache<L> {
         }
     }
 
-    fn active(&self) -> &PathDict<L> {
+    pub fn active(&self) -> &PathDict<L> {
         self.paths.last().unwrap()
     }
 

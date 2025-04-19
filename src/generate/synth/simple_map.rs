@@ -13,7 +13,7 @@ where
     O: TermValue + Clone,
 {
     let start = start.unwrap_or_else(|| {
-        (1..)
+        (2..)
             .flat_map(|size| search(&lang, vec![], &ty, size))
             .next()
             .unwrap()

@@ -7,7 +7,13 @@ use utils::*;
 
 fn main() -> std::io::Result<()> {
     let lang = LogicLang::new(1);
-    let oeis = oeis::load_oeis_def()?;
+
+    let opts = OEISLoadOptions {
+        required: vec!["nonn"],
+        max_val: 88,
+        ..Default::default()
+    };
+    let oeis = load_oeis(&opts)?;
 
     let mut output_file = std::fs::File::create("data/oeis_individual")?;
 
@@ -19,10 +25,13 @@ fn main() -> std::io::Result<()> {
     let keys = vec![18252];
 
     for id in keys {
-        let nums = &oeis.seq[&id];
+        let nums = &oeis.seq[&id]
+            .iter()
+            .map(|n| *n as u32)
+            .collect::<Vec<u32>>();
 
         let examples =
-            nums.iter().cloned().enumerate().map(|(i, n)| (i as i32, n));
+            (2u32..opts.max_val as u32).map(|n| (n, nums.contains(&n)));
 
         let output = simple_map(
             lang.clone(),
@@ -33,7 +42,9 @@ fn main() -> std::io::Result<()> {
                 bias: SizeBias::DistAbs { mean: 20, c: 0.5 },
                 ..Default::default()
             },
-            Options { print_freq: None },
+            Options {
+                print_freq: Some(1),
+            },
         );
 
         if output.score.is_none() {

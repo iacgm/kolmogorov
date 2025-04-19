@@ -7,7 +7,7 @@ fn main() {
     let lang = Opaque;
 
     let examples: Vec<_> =
-        (0..10).map(|n| (n, 4 * n * n * n + n * n)).collect();
+        (0i32..10).map(|n| (n, 4 * n * n * n + n * n)).collect();
 
     let lang_ctxt = lang.context();
 
@@ -38,7 +38,7 @@ fn main() {
         Some((TUNING_PARAM * num_correct).exp())
     };
 
-    let start = term!(n -> plus(plus(plus(plus(n))n)n)n);
+    let start = term!(n -> n);
 
     let ty = ty!(N => N);
 

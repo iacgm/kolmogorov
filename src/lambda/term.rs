@@ -195,9 +195,10 @@ impl Display for Term {
                 write!(fmt, " -> {}", r)?;
                 write!(fmt, ")")
             }
-            App(l, r) => {
-                write!(fmt, "{}({})", (**l).borrow(), (**r).borrow())
-            }
+            App(l, r) => match &*r.borrow() {
+                Lam(_, _) => write!(fmt, "{}{}", l.borrow(), r.borrow()),
+                _ => write!(fmt, "{}({})", (**l).borrow(), (**r).borrow()),
+            },
         }
     }
 }

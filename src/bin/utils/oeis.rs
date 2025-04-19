@@ -1,3 +1,5 @@
+use std::ops::Range;
+
 use rustc_hash::FxHashMap as HashMap;
 
 const MIN_EXAMPLE_COUNT: usize = 10;
@@ -11,6 +13,7 @@ pub struct OEISMap {
 pub struct OEISLoadOptions {
     pub required: Vec<&'static str>,
     pub disallow: Vec<&'static str>,
+    pub max_val: i32,
 }
 
 impl Default for OEISLoadOptions {
@@ -21,6 +24,7 @@ impl Default for OEISLoadOptions {
                 "base", "bref", "cofr", "cons", "dumb", "fini", "full", "hard",
                 "obsc", "word", "dupe",
             ],
+            max_val: i32::MAX,
         }
     }
 }
@@ -78,6 +82,10 @@ pub fn load_oeis(options: &OEISLoadOptions) -> std::io::Result<OEISMap> {
             let Ok(n) = word.parse::<i32>() else {
                 break;
             };
+
+            if n > options.max_val {
+                break;
+            }
 
             nums.push(n)
         }

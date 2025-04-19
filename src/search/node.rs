@@ -229,6 +229,7 @@ impl<L: Language> Node<L> {
                     }
 
                     let (var, v_ty) = vars.pop()?;
+
                     let size = *size;
 
                     if size == 1 {
@@ -266,11 +267,6 @@ impl<L: Language> Node<L> {
                     arg_state,
                     res,
                 } => {
-                    if left_analysis.malformed() {
-                        *self = Nil;
-                        return None;
-                    }
-
                     if let Some(curr_state) = state {
                         match curr_state.next(search_ctxt) {
                             Some(term) => return Some(term),
@@ -280,6 +276,11 @@ impl<L: Language> Node<L> {
 
                     let size = *size;
                     if size == 1 {
+                        *self = Nil;
+                        return None;
+                    }
+
+                    if left_analysis.malformed() {
                         *self = Nil;
                         return None;
                     }

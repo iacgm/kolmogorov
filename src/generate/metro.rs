@@ -127,7 +127,7 @@ fn mutate<L: Language>(
                 var_node,
                 new_var,
                 var_analysis,
-            );
+            )?;
 
             Some((candidate, analysis, 1.))
         }
@@ -153,7 +153,7 @@ fn mutate<L: Language>(
                 replacement_node,
                 new_term,
                 new_analysis,
-            );
+            )?;
 
             if !proposal.in_beta_normal_form() {
                 return None;
@@ -197,7 +197,7 @@ fn mutate<L: Language>(
                 replacement_node,
                 replacement,
                 replacement_analysis,
-            );
+            )?;
 
             if !proposal.in_beta_normal_form() {
                 return None;
@@ -269,7 +269,7 @@ pub fn replace_subnode<L: Language>(
     node_id: usize,
     src: Term,
     src_analysis: Analysis<L>,
-) -> (Term, Analysis<L>) {
+) -> Option<(Term, Analysis<L>)> {
     fn helper<L: Language>(
         counter: &mut usize,
         lang: &L,
@@ -278,11 +278,11 @@ pub fn replace_subnode<L: Language>(
         node_id: usize,
         src: Term,
         src_analysis: Analysis<L>,
-    ) -> (Term, Analysis<L>) {
+    ) -> Option<(Term, Analysis<L>)> {
         *counter += 1;
 
         if *counter == node_id {
-            return (src, src_analysis);
+            return Some((src, src_analysis));
         }
 
         let ptr = dest as *const Term;
@@ -308,8 +308,11 @@ pub fn replace_subnode<L: Language>(
                     node_id,
                     src,
                     src_analysis,
-                );
-                (Lam(*v, body.into()), lang.slam(*v, body_anal, ty))
+                )?;
+                if body_anal.malformed() {
+                    return None;
+                }
+                Some((Lam(*v, body.into()), lang.slam(*v, body_anal, ty)))
             }
             App(l, r) => {
                 let l = &*(**l).borrow();
@@ -321,7 +324,7 @@ pub fn replace_subnode<L: Language>(
                     node_id,
                     src.clone(),
                     src_analysis.clone(),
-                );
+                )?;
 
                 let r = &*(**r).borrow();
                 let (r, r_analysis) = helper(
@@ -332,15 +335,19 @@ pub fn replace_subnode<L: Language>(
                     node_id,
                     src,
                     src_analysis,
-                );
+                )?;
 
-                (
+                if l_analysis.malformed() || r_analysis.malformed() {
+                    return None;
+                }
+
+                Some((
                     App(l.into(), r.into()),
                     lang.sapp(l_analysis, r_analysis, ty),
-                )
+                ))
             }
-            Val(term_value) => (dest.clone(), lang.sval(term_value, ty)),
-            Var(identifier) => (dest.clone(), lang.svar(*identifier, ty)),
+            Val(term_value) => Some((dest.clone(), lang.sval(term_value, ty))),
+            Var(identifier) => Some((dest.clone(), lang.svar(*identifier, ty))),
         }
     }
 
@@ -390,6 +397,31 @@ pub fn random_subnode(
     }
 
     (selected_id, annotation.clone(), small_counter)
+}
+
+#[allow(dead_code)]
+fn show_node_id(term: &Term, id: usize) {
+    fn helper(term: &Term, id: usize, counter: &mut usize) {
+        *counter += 1;
+
+        if *counter == id {
+            println!(">>>{}", term);
+            return;
+        }
+
+        use Term::*;
+        match term {
+            Ref(r) => helper(&r.borrow(), id, counter),
+            Val(_) | Var(_) => (),
+            Lam(_, term) => helper(term, id, counter),
+            App(left, right) => {
+                helper(&left.borrow(), id, counter);
+                helper(&right.borrow(), id, counter);
+            }
+        }
+    }
+
+    helper(term, id, &mut 0)
 }
 
 #[derive(Clone, Debug)]
@@ -523,6 +555,7 @@ struct SizeCache<L: Language> {
     map: HashMap<VarsVec, CtxtCache<L>>,
 }
 
+#[derive(Debug)]
 enum CacheEntry<L: Language> {
     Explicit(Vec<(Term, Analysis<L>)>),
     Count(usize),

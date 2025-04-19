@@ -5,12 +5,13 @@ use languages::*;
 
 fn main() {
     let lang = LogicLang::new(1);
-    let ty = ty!(N => Bool);
+    let ty = ty!(Bool);
 
     for n in 1.. {
         let start = std::time::Instant::now();
 
-        let searcher = search::search(&lang, vec![], &ty, n);
+        let searcher =
+            search::search(&lang, vec![("n".into(), ty!(N).into())], &ty, n);
 
         let count = searcher.count();
 

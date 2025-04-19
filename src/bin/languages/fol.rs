@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::fmt::{write, Display};
 use std::rc::Rc;
 
 use kolmogorov::*;
@@ -27,7 +27,8 @@ type Conjunction = Vec<Literal>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Exists {
-    limit: Number,
+    var: Identifier,
+    bound: Number,
     body: Rc<LogicSems>,
 }
 
@@ -37,7 +38,7 @@ pub enum LogicSems {
     And(Conjunction),                // A conjunction of Literals
     App(Identifier, Vec<LogicSems>), // Variables are not analyzed until they are contextualized
     Any(Exists),
-    Abs(Identifier, Box<LogicSems>),
+    Abs(Identifier, Rc<LogicSems>),
 }
 
 impl Language for LogicLang {
@@ -58,7 +59,7 @@ impl Language for LogicLang {
         use Type::*;
         match ty {
             // Disallow function variables
-            Fun(_, _) => Malformed,
+            Fun(_, _) if self.context.get(v).is_none() => Malformed,
             Var(Name("N")) => Canonical(Val(v)),
             _ => Canonical(App(v, vec![])),
         }
@@ -85,7 +86,7 @@ impl Language for LogicLang {
             return Malformed;
         }
 
-        Canonical(Abs(ident, Box::new(body.canon())))
+        Canonical(Abs(ident, Rc::new(body.canon())))
     }
 
     fn sapp(
@@ -116,7 +117,7 @@ impl Language for LogicLang {
             }
             App(v, mut args) if v.as_str() == "and" && args.len() == 1 => {
                 let (And(mut bools), And(rest)) = (args.remove(0), arg) else {
-                    unreachable!()
+                    return Malformed;
                 };
 
                 bools.extend(rest);
@@ -129,18 +130,26 @@ impl Language for LogicLang {
                     unreachable!()
                 };
 
-                if arg.depth() == self.max_depth {
+                let Abs(var, body) = arg else {
+                    return Malformed;
+                };
+
+                if body.depth() == self.max_depth {
                     return Malformed;
                 }
 
-                let body = arg.into();
-                Any(Exists { limit, body })
+                Any(Exists {
+                    var,
+                    bound: limit,
+                    body,
+                })
             }
             App(v, mut args) => {
                 args.push(arg);
                 App(v, args)
             }
-            _ => unimplemented!(),
+            Abs(_, _) => return Malformed,
+            _ => unimplemented!("{} @ {}", fun, arg),
         };
 
         Canonical(sems)
@@ -160,7 +169,7 @@ impl LogicLang {
         let exists = builtin! {
             N => (N => Bool) => Bool
             ctxt |b, f| => {
-                Term::val((0..b.get::<u32>()).any(|n| ctxt.evaluate(&term!([f] [:n])).get::<bool>()))
+                Term::val((1..b.get::<u32>()).any(|n| ctxt.evaluate(&term!([f] [:n])).get::<bool>()))
             }
         };
 
@@ -218,8 +227,50 @@ fn is_prime(n: u32) -> bool {
     true
 }
 
+impl Display for Predicate {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use Predicate::*;
+        match self {
+            Prime(identifier) => write!(f, "Prime({})", identifier),
+            Divisor(p, q) => write!(f, "{}|{}", p, q),
+        }
+    }
+}
+
 impl Display for LogicSems {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self)
+        use LogicSems::*;
+        match self {
+            Val(identifier) => write!(f, "{}", identifier),
+            And(items) => {
+                write!(f, "{}", items[0].1)?;
+                for cond in &items[1..] {
+                    write!(f, "∧{}", cond.1)?;
+                }
+                Ok(())
+            }
+            App(identifier, items) => {
+                write!(f, "{}", identifier)?;
+                for item in items {
+                    match item {
+                        Abs(_, _) => write!(f, "{}", item)?,
+                        _ => write!(f, "({})", item)?,
+                    }
+                }
+                Ok(())
+            }
+            Any(exists) => {
+                write!(f, "∃{}<{} [{}]", exists.var, exists.bound, exists.body)
+            }
+            Abs(identifier, body) => {
+                write!(f, "({} ", identifier)?;
+                let mut next = body;
+                while let Abs(v, body) = &**next {
+                    write!(f, "{} ", v)?;
+                    next = body;
+                }
+                write!(f, "-> {})", next)
+            }
+        }
     }
 }
