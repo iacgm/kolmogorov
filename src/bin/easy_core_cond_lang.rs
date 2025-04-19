@@ -41,7 +41,7 @@ fn main() -> std::io::Result<()> {
             use std::io::*;
 
             let term = output.term;
-            let analysis = lang.analyze(&term);
+            let analysis = output.analysis;
 
             let text = format!(
                 "Solution found for A{:06}: {} (≈ {})",

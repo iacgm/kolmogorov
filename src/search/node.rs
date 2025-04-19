@@ -188,8 +188,9 @@ impl<L: Language> Node<L> {
                             Some((term, analysis)) => {
                                 let term = Term::Lam(ident, term.into());
 
-                                let analysis =
-                                    search_ctxt.lang.slam(ident, analysis);
+                                let analysis = search_ctxt
+                                    .lang
+                                    .slam(ident, analysis, targ);
                                 Some((term, analysis))
                             }
                             None => {
@@ -234,14 +235,14 @@ impl<L: Language> Node<L> {
                         if v_ty == *targ {
                             return Some((
                                 Term::Var(var),
-                                search_ctxt.lang.svar(var),
+                                search_ctxt.lang.svar(var, targ),
                             ));
                         } else {
                             continue;
                         }
                     }
 
-                    let analysis = search_ctxt.lang.svar(var);
+                    let analysis = search_ctxt.lang.svar(var, targ);
 
                     *state = Some(Box::new(Arg {
                         targ: targ.clone(),
@@ -265,6 +266,11 @@ impl<L: Language> Node<L> {
                     arg_state,
                     res,
                 } => {
+                    if left_analysis.malformed() {
+                        *self = Nil;
+                        return None;
+                    }
+
                     if let Some(curr_state) = state {
                         match curr_state.next(search_ctxt) {
                             Some(term) => return Some(term),
@@ -358,13 +364,15 @@ impl<L: Language> Node<L> {
                         *state = None;
                     };
 
-                    let analysis = search_ctxt
-                        .lang
-                        .sapp(left_analysis.clone(), arg_analysis);
+                    let analysis = search_ctxt.lang.sapp(
+                        left_analysis.clone(),
+                        arg_analysis,
+                        targ,
+                    );
                     let left = Term::App(left.clone(), arg.into());
 
                     if let Some(term) = search_ctxt.cache.yield_term(
-                        l_ty,
+                        ret_ty,
                         left.size(),
                         None,
                         left,

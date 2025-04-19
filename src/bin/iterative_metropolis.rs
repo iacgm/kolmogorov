@@ -31,7 +31,7 @@ fn main() {
 
     if output.score.is_none() {
         let term = output.term;
-        let analysis = lang.analyze(&term);
+        let analysis = output.analysis;
 
         let text = format!("Solution found : {} (≈ {})", term, analysis);
 

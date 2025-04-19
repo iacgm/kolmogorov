@@ -21,5 +21,5 @@ fn main() {
         Options::default(),
     );
 
-    output.display(lang)
+    output.display()
 }

@@ -4,7 +4,7 @@
 
 use super::*;
 use rustc_hash::FxHashMap as HashMap;
-use std::rc::Rc;
+use std::{fmt::Debug, rc::Rc};
 
 #[derive(Clone)]
 pub struct Context {
@@ -12,7 +12,7 @@ pub struct Context {
 }
 
 impl Context {
-    pub fn new(defs: impl Iterator<Item = (Identifier, BuiltIn)>) -> Self {
+    pub fn new(defs: impl IntoIterator<Item = (Identifier, BuiltIn)>) -> Self {
         Self {
             defs: HashMap::from_iter(defs),
         }
@@ -170,4 +170,10 @@ impl Context {
 enum SpineCollapse {
     Whnf,
     Exec(BuiltIn, Vec<Thunk>),
+}
+
+impl Debug for Context {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self.defs.keys().collect::<Vec<_>>())
+    }
 }

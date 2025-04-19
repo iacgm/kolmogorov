@@ -20,11 +20,11 @@ pub trait Language: Sized + Clone + Debug {
 
     fn context(&self) -> Context;
 
-    fn sval(&self, _: &Rc<dyn TermValue>) -> Analysis<Self> {
+    fn sval(&self, _: &Value, _ty: &Type) -> Analysis<Self> {
         Analysis::Unique
     }
 
-    fn svar(&self, _: Identifier) -> Analysis<Self> {
+    fn svar(&self, _: Identifier, _ty: &Type) -> Analysis<Self> {
         Analysis::Unique
     }
 
@@ -32,6 +32,7 @@ pub trait Language: Sized + Clone + Debug {
         &self,
         _ident: Identifier,
         _body: Analysis<Self>,
+        _ty: &Type,
     ) -> Analysis<Self> {
         Analysis::Unique
     }
@@ -40,21 +41,23 @@ pub trait Language: Sized + Clone + Debug {
         &self,
         _fun: Analysis<Self>,
         _arg: Analysis<Self>,
+        _ty: &Type,
     ) -> Analysis<Self> {
         Analysis::Unique
     }
+}
 
-    fn analyze(&self, term: &Term) -> Analysis<Self> {
-        use Term::*;
-        match term {
-            Val(v) => self.sval(v),
-            Var(v) => self.svar(*v),
-            Lam(i, b) => self.slam(*i, self.analyze(b)),
-            App(l, r) => {
-                self.sapp(self.analyze(&l.borrow()), self.analyze(&r.borrow()))
-            }
-            Ref(r) => self.analyze(&r.borrow()),
+impl<L: Language> Analysis<L> {
+    pub fn canon(self) -> L::Semantics {
+        use Analysis::*;
+        match self {
+            Canonical(c) => c,
+            _ => panic!("`canon` called on {:?}", self),
         }
+    }
+
+    pub fn malformed(&self) -> bool {
+        matches!(self, Self::Malformed)
     }
 }
 

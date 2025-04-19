@@ -6,11 +6,7 @@ use languages::*;
 fn main() {
     let lang = Polynomials;
 
-    use Term::*;
-    let term = App(
-        App(Var("plus".into()).into(), Term::val(1).into()).into(),
-        Term::val(0).into(),
-    );
+    let term = term!(plus (plus one one));
 
     println!("out={:?}", term);
     let out = lang.context().evaluate(&term);

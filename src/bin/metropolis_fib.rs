@@ -92,11 +92,11 @@ fn main() {
 
     let iterations = 150_000;
 
-    let (_, metropolis_search) =
+    let (_, metropolis_search, analysis) =
         metropolis(&lang, &start, &ty, scorer, iterations, Options::default());
 
     println!("Best Found: {}", &metropolis_search);
-    println!("Semantics:  {}", lang.analyze(&metropolis_search));
+    println!("Semantics:  {}", analysis);
 
     println!(
         "Score: {:?} (or {:?} correct)",

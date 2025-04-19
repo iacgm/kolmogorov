@@ -44,7 +44,7 @@ fn main() {
 
     let iterations = 50_000;
 
-    let (_, metropolis_search) =
+    let (_, metropolis_search, _) =
         metropolis(&lang, &start, &ty, scorer, iterations, Options::default());
 
     println!("Best Found: {}", metropolis_search);

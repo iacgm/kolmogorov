@@ -7,7 +7,7 @@ pub fn iterative<L, I, O>(
     ty: Type,
     settings: SynthesisParameters,
     options: Options,
-) -> MetropolisOutput
+) -> MetropolisOutput<L>
 where
     L: Language,
     I: TermValue + Clone,
@@ -69,7 +69,7 @@ where
     };
 
     let start_time = std::time::Instant::now();
-    let (iterations, term) =
+    let (iterations, term, analysis) =
         metropolis(&lang, &start, &ty, scorer, settings.iterations, options);
     let end_time = std::time::Instant::now();
 
@@ -82,5 +82,6 @@ where
         time: end_time.duration_since(start_time).as_secs_f64(),
         num_correct,
         score,
+        analysis,
     }
 }

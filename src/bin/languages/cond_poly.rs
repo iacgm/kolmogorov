@@ -97,30 +97,27 @@ impl Language for CondPolyLang {
             |p, f| => term!([f] [p])
         );
 
-        Context::new(
-            [
-                ("(+)".into(), plus),
-                ("(-)".into(), sub),
-                ("(*)".into(), mult),
-                ("'1'".into(), one),
-                ("'0'".into(), zero),
-                ("case".into(), case),
-                ("eval".into(), eval),
-                ("orelse".into(), orelse),
-                ("eqz".into(), eqz),
-                ("pos".into(), pos),
-                ("and".into(), and),
-                ("def".into(), def),
-            ]
-            .into_iter(),
-        )
+        Context::new([
+            ("(+)".into(), plus),
+            ("(-)".into(), sub),
+            ("(*)".into(), mult),
+            ("'1'".into(), one),
+            ("'0'".into(), zero),
+            ("case".into(), case),
+            ("eval".into(), eval),
+            ("orelse".into(), orelse),
+            ("eqz".into(), eqz),
+            ("pos".into(), pos),
+            ("and".into(), and),
+            ("def".into(), def),
+        ])
     }
 
-    fn sval(&self, _: &std::rc::Rc<dyn TermValue>) -> Analysis<Self> {
+    fn sval(&self, _: &Value, _ty: &Type) -> Analysis<Self> {
         unimplemented!()
     }
 
-    fn svar(&self, v: Identifier) -> Analysis<Self> {
+    fn svar(&self, v: Identifier, _ty: &Type) -> Analysis<Self> {
         use Analysis::*;
         use CondPolySems::*;
 
@@ -137,7 +134,12 @@ impl Language for CondPolyLang {
         }
     }
 
-    fn slam(&self, ident: Identifier, body: Analysis<Self>) -> Analysis<Self> {
+    fn slam(
+        &self,
+        ident: Identifier,
+        body: Analysis<Self>,
+        _ty: &Type,
+    ) -> Analysis<Self> {
         use Analysis::*;
         use CondPolySems::*;
 
@@ -148,7 +150,12 @@ impl Language for CondPolyLang {
         Canonical(Func(ident, body.into()))
     }
 
-    fn sapp(&self, fun: Analysis<Self>, arg: Analysis<Self>) -> Analysis<Self> {
+    fn sapp(
+        &self,
+        fun: Analysis<Self>,
+        arg: Analysis<Self>,
+        _ty: &Type,
+    ) -> Analysis<Self> {
         use Analysis::*;
         use CondPolySems::*;
 

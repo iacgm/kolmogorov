@@ -16,8 +16,10 @@ fn main() -> std::io::Result<()> {
     let mut keys = oeis.seq.keys().collect::<Vec<_>>();
     keys.sort();
 
+    let keys = vec![18252];
+
     for id in keys {
-        let nums = &oeis.seq[id];
+        let nums = &oeis.seq[&id];
 
         let examples =
             nums.iter().cloned().enumerate().map(|(i, n)| (i as i32, n));
@@ -38,11 +40,11 @@ fn main() -> std::io::Result<()> {
             use std::io::*;
 
             let term = output.term;
-            let analysis = lang.analyze(&term);
+            let semantics = output.analysis.canon();
 
             let text = format!(
                 "Solution found for A{:06}: {} (≈ {})",
-                id, term, analysis
+                id, term, semantics
             );
 
             println!("{}", text);

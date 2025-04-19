@@ -43,7 +43,7 @@ macro_rules! builtin {
 	(
 		$($ty:tt)=>+
 		$(with [$($captured:ident),+] in)?
-		|$($arg:ident),*| => $body:expr
+    $($ctxt:ident)? |$($arg:ident),*| => $body:expr
 	) => {{
 		use $crate::*;
 		use std::rc::Rc;
@@ -60,6 +60,10 @@ macro_rules! builtin {
 			let rev_list!([$($arg),*]) = &_args[..] else {
 				unreachable!()
 			};
+
+      $(
+        let $ctxt = _ctxt;
+      )?
 
 			$(
 				let $arg = (**$arg).borrow();

@@ -4,10 +4,10 @@ mod languages;
 use languages::*;
 
 fn main() {
-    let lang = CondPolyLang;
-    let ty = ty!(N);
+    let lang = LogicLang::new(1);
+    let ty = ty!(N => Bool);
 
-    for n in 5..=5 {
+    for n in 1.. {
         let start = std::time::Instant::now();
 
         let searcher = search::search(&lang, vec![], &ty, n);

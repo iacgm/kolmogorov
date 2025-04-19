@@ -18,12 +18,13 @@ pub struct SynthesisParameters {
     pub iterations: usize,
 }
 
-pub struct MetropolisOutput {
+pub struct MetropolisOutput<L: Language> {
     pub term: Term,
     pub iterations: usize,
     pub time: f64,
     pub num_correct: usize,
     pub score: Option<f64>,
+    pub analysis: Analysis<L>,
 }
 
 impl Default for SynthesisParameters {
@@ -75,18 +76,19 @@ impl SizeBias {
     }
 }
 
-impl MetropolisOutput {
-    pub fn display<L: Language>(&self, lang: L) {
+impl<L: Language> MetropolisOutput<L> {
+    pub fn display(&self) {
         let MetropolisOutput {
             term,
             iterations,
             time,
             num_correct,
             score,
+            analysis,
         } = self;
 
         println!("Best Found: {}", &term);
-        println!("Semantics:  {}", lang.analyze(term));
+        println!("Semantics:  {}", analysis);
 
         println!("Score: {:?} (or {:?} correct)", score, num_correct,);
 

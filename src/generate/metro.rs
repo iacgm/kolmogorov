@@ -35,15 +35,18 @@ pub fn metropolis<F: FnMut(&Term) -> Option<f64>, L: Language>(
     mut scorer: F,
     iterations: usize,
     options: Options,
-) -> (usize, Term) {
+) -> (usize, Term, Analysis<L>) {
     let mut i = 0;
     let mut candidate = start.clone();
-    let Some(mut score) = scorer(start) else {
-        return (i, start.clone());
-    };
 
     let mut best_candidate = start.clone();
     let mut best_score = 0.;
+    // Technically, we should probably perform some analysis here.
+    let mut best_analysis = Analysis::Unique;
+
+    let Some(mut score) = scorer(start) else {
+        return (i, candidate, best_analysis);
+    };
 
     let mut cache = SizeCache::default();
 
@@ -62,17 +65,18 @@ pub fn metropolis<F: FnMut(&Term) -> Option<f64>, L: Language>(
         }
 
         // g_ratio = g(x|x') / g(x'|x)
-        let Some((proposal, g_ratio)) =
+        let Some((proposal, analysis, g_ratio)) =
             mutate(lang, &candidate, ty, &mut cache)
         else {
             continue;
         };
 
         let Some(proposal_score) = scorer(&proposal) else {
-            return (i, proposal);
+            return (i, proposal, analysis);
         };
 
         if proposal_score > best_score {
+            best_analysis = analysis;
             best_score = proposal_score;
             best_candidate = proposal.clone();
         }
@@ -87,7 +91,7 @@ pub fn metropolis<F: FnMut(&Term) -> Option<f64>, L: Language>(
         }
     }
 
-    (i, best_candidate)
+    (i, best_candidate, best_analysis)
 }
 
 // Mutates a &Term. Also returns g(x|x') / g(x'|x) [where x' is the proposal]
@@ -96,31 +100,16 @@ fn mutate<L: Language>(
     term: &Term,
     ty: &Type,
     cache: &mut SizeCache<L>,
-) -> Option<(Term, f64)> {
+) -> Option<(Term, Analysis<L>, f64)> {
     let ctxt = lang.context();
 
     use MutationTy::*;
     match MutationTy::choose_replacement_kind() {
         HVar => {
-            let (replacement_node, annotation, _) =
-                random_subnode(&ctxt, term, ty, 1, 1);
+            let term_meta = annotate_term(term, &ctxt, ty);
 
-            let (_, proposal) = cache.sample(
-                lang,
-                annotation.decls,
-                &annotation.ty,
-                annotation.size,
-            );
-
-            let (new_term, _analysis) = proposal.unwrap();
-
-            let candidate = replace_subnode(term, replacement_node, new_term);
-
-            Some((candidate, 1.))
-        }
-        Small => {
-            let (replacement_node, annotation, _) =
-                random_subnode(&ctxt, term, ty, 2, L::SMALL_SIZE);
+            let (var_node, annotation, _) =
+                random_subnode(term, &term_meta, 1, 1);
 
             let (_, replacement) = cache.sample(
                 lang,
@@ -129,22 +118,57 @@ fn mutate<L: Language>(
                 annotation.size,
             );
 
-            let (new_term, _analysis) = replacement.unwrap();
+            let (new_var, var_analysis) = replacement.unwrap();
 
-            let proposal = replace_subnode(term, replacement_node, new_term);
+            let (candidate, analysis) = replace_subnode(
+                lang,
+                term,
+                &term_meta,
+                var_node,
+                new_var,
+                var_analysis,
+            );
+
+            Some((candidate, analysis, 1.))
+        }
+        Small => {
+            let term_meta = annotate_term(term, &ctxt, ty);
+
+            let (replacement_node, annotation, _) =
+                random_subnode(term, &term_meta, 2, L::SMALL_SIZE);
+
+            let (_, replacement) = cache.sample(
+                lang,
+                annotation.decls,
+                &annotation.ty,
+                annotation.size,
+            );
+
+            let (new_term, new_analysis) = replacement.unwrap();
+
+            let (proposal, analysis) = replace_subnode(
+                lang,
+                term,
+                &term_meta,
+                replacement_node,
+                new_term,
+                new_analysis,
+            );
 
             if !proposal.in_beta_normal_form() {
                 return None;
             }
 
-            Some((proposal, 1.))
+            Some((proposal, analysis, 1.))
         }
         Large => {
             use rand::distributions::Distribution;
             use statrs::distribution::Binomial;
 
+            let term_meta = annotate_term(term, &ctxt, ty);
+
             let (replacement_node, annotation, subnode_count) =
-                random_subnode(&ctxt, term, ty, 2, L::LARGE_SIZE);
+                random_subnode(term, &term_meta, 2, L::LARGE_SIZE);
 
             if subnode_count == 0 {
                 return None;
@@ -164,9 +188,16 @@ fn mutate<L: Language>(
                 replacement_size,
             );
 
-            let (replacement, _analysis) = replacement?;
+            let (replacement, replacement_analysis) = replacement?;
 
-            let proposal = replace_subnode(term, replacement_node, replacement);
+            let (proposal, analysis) = replace_subnode(
+                lang,
+                term,
+                &term_meta,
+                replacement_node,
+                replacement,
+                replacement_analysis,
+            );
 
             if !proposal.in_beta_normal_form() {
                 return None;
@@ -187,8 +218,10 @@ fn mutate<L: Language>(
                 new_count,
             );
 
+            let prop_meta = annotate_term(&proposal, &ctxt, ty);
+
             let (_, _, subnode_count) =
-                random_subnode(&ctxt, &proposal, ty, 2, L::LARGE_SIZE);
+                random_subnode(&proposal, &prop_meta, 2, L::LARGE_SIZE);
 
             if subnode_count == 0 {
                 return None;
@@ -202,7 +235,7 @@ fn mutate<L: Language>(
                 old_count,
             );
 
-            Some((proposal, g2 / g1))
+            Some((proposal, analysis, g2 / g1))
         }
     }
 }
@@ -229,44 +262,97 @@ fn g<L: Language>(
     prob_subnode_selected * prob_size_selected * prob_replacement_generated
 }
 
-pub fn replace_subnode(dest: &Term, node_id: usize, src: Term) -> Term {
-    fn helper(
+pub fn replace_subnode<L: Language>(
+    lang: &L,
+    dest: &Term,
+    dest_meta: &Metadata,
+    node_id: usize,
+    src: Term,
+    src_analysis: Analysis<L>,
+) -> (Term, Analysis<L>) {
+    fn helper<L: Language>(
         counter: &mut usize,
+        lang: &L,
         dest: &Term,
+        dest_meta: &Metadata,
         node_id: usize,
         src: Term,
-    ) -> Term {
+        src_analysis: Analysis<L>,
+    ) -> (Term, Analysis<L>) {
         *counter += 1;
 
         if *counter == node_id {
-            return src;
+            return (src, src_analysis);
         }
+
+        let ptr = dest as *const Term;
+        let ty = &dest_meta[&ptr].ty;
 
         use Term::*;
         match dest {
-            Ref(r) => helper(counter, &(**r).borrow(), node_id, src),
-            Lam(v, b) => Lam(*v, helper(counter, b, node_id, src).into()),
-            App(l, r) => {
-                let l = &(**l).borrow().clone();
-                let l = helper(counter, l, node_id, src.clone());
-                let r = &(**r).borrow().clone();
-                let r = helper(counter, r, node_id, src);
-                App(l.into(), r.into())
+            Ref(r) => helper(
+                counter,
+                lang,
+                &(**r).borrow(),
+                dest_meta,
+                node_id,
+                src,
+                src_analysis,
+            ),
+            Lam(v, b) => {
+                let (body, body_anal) = helper(
+                    counter,
+                    lang,
+                    b,
+                    dest_meta,
+                    node_id,
+                    src,
+                    src_analysis,
+                );
+                (Lam(*v, body.into()), lang.slam(*v, body_anal, ty))
             }
-            _ => dest.clone(),
+            App(l, r) => {
+                let l = &*(**l).borrow();
+                let (l, l_analysis) = helper(
+                    counter,
+                    lang,
+                    l,
+                    dest_meta,
+                    node_id,
+                    src.clone(),
+                    src_analysis.clone(),
+                );
+
+                let r = &*(**r).borrow();
+                let (r, r_analysis) = helper(
+                    counter,
+                    lang,
+                    r,
+                    dest_meta,
+                    node_id,
+                    src,
+                    src_analysis,
+                );
+
+                (
+                    App(l.into(), r.into()),
+                    lang.sapp(l_analysis, r_analysis, ty),
+                )
+            }
+            Val(term_value) => (dest.clone(), lang.sval(term_value, ty)),
+            Var(identifier) => (dest.clone(), lang.svar(*identifier, ty)),
         }
     }
 
-    helper(&mut 0, dest, node_id, src)
+    helper(&mut 0, lang, dest, dest_meta, node_id, src, src_analysis)
 }
 
 // Reservoir sampling, again.
 // We return the index of the subnode (using pre-order numbering) & its size
 // Returns (node_id, annotation, small_node_count)
 pub fn random_subnode(
-    ctxt: &Context,
     term: &Term,
-    ty: &Type,
+    meta: &Metadata,
     min_size: usize,
     max_size: usize,
 ) -> (usize, Annotation, usize) {
@@ -275,10 +361,8 @@ pub fn random_subnode(
     let mut counter = 1;
     let mut small_counter = 0;
 
-    let metadata = annotate_term(term, ctxt, ty);
-
     let ptr = term as *const Term;
-    let mut annotation = metadata.get(&ptr).unwrap();
+    let mut annotation = meta.get(&ptr).unwrap();
 
     while let Some((next, ptr)) = stack.pop() {
         let size = next.size();
@@ -287,7 +371,7 @@ pub fn random_subnode(
             small_counter += 1;
             if with_probability(1. / small_counter as f64) {
                 selected_id = counter;
-                annotation = metadata.get(&ptr).unwrap();
+                annotation = meta.get(&ptr).unwrap();
             }
         }
 

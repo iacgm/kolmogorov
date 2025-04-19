@@ -5,9 +5,11 @@ use std::rc::Rc;
 
 pub type Thunk = Rc<RefCell<Term>>;
 
+pub type Value = Rc<dyn TermValue>;
+
 #[derive(Clone, Debug)]
 pub enum Term {
-    Val(Rc<dyn TermValue>),
+    Val(Value),
     Var(Identifier),
     Lam(Identifier, Rc<Term>),
     App(Thunk, Thunk),
@@ -77,7 +79,7 @@ impl Term {
         }
     }
 
-    pub fn leaf_val(&self) -> Option<Rc<dyn TermValue>> {
+    pub fn leaf_val(&self) -> Option<Value> {
         use Term::*;
         match self {
             Ref(r) => r.borrow().leaf_val(),
@@ -123,7 +125,7 @@ impl Term {
     }
 }
 
-pub fn cast<T: TermValue>(rc: &Rc<dyn TermValue>) -> Option<&T> {
+pub fn cast<T: TermValue>(rc: &Value) -> Option<&T> {
     rc.as_any().downcast_ref()
 }
 
@@ -131,12 +133,12 @@ pub trait TermValue: Any + Debug + Display {
     // For some reason requiring PartialEq is bad but this is okay?
     // If you don't love Rust at its trait bound restrictions,
     // you don't deserve it at its... uhhh... nevermind...
-    fn is_eq(&self, other: &Rc<dyn TermValue>) -> bool;
+    fn is_eq(&self, other: &Value) -> bool;
     fn as_any(&self) -> &dyn Any;
 }
 
 impl<T: Any + Debug + Display + PartialEq> TermValue for T {
-    fn is_eq(&self, other: &Rc<dyn TermValue>) -> bool {
+    fn is_eq(&self, other: &Value) -> bool {
         let Some(other) = other.as_any().downcast_ref::<T>() else {
             return false;
         };

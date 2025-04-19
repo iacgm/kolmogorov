@@ -36,8 +36,7 @@ fn main() -> std::io::Result<()> {
         if output.score.is_none() {
             use std::io::*;
 
-            let term = output.term;
-            let analysis = lang.analyze(&term);
+            let MetropolisOutput { term, analysis, .. } = output;
 
             let text = format!(
                 "Solution found for A{:06}: {} (≈ {})",

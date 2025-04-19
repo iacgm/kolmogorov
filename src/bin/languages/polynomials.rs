@@ -22,7 +22,7 @@ impl Language for Polynomials {
     const SMALL_SIZE: usize = 10;
     const LARGE_SIZE: usize = 15;
 
-    fn context(&self) -> kolmogorov::Context {
+    fn context(&self) -> Context {
         let plus = builtin!(
             N => N => N
             |x, y| => Term::val(x.get::<i32>().wrapping_add(y.get::<i32>()))
@@ -46,11 +46,11 @@ impl Language for Polynomials {
         context! { plus, mult, one, zero }
     }
 
-    fn sval(&self, v: &Rc<dyn TermValue>) -> Analysis<Self> {
+    fn sval(&self, v: &Value, _: &Type) -> Analysis<Self> {
         Canonical(PolySem::num(*cast(v).unwrap()))
     }
 
-    fn svar(&self, v: Identifier) -> Analysis<Self> {
+    fn svar(&self, v: Identifier, _: &Type) -> Analysis<Self> {
         use Identifier::*;
         match v {
             Name("plus") => {
@@ -69,7 +69,12 @@ impl Language for Polynomials {
         }
     }
 
-    fn slam(&self, ident: Identifier, body: Analysis<Self>) -> Analysis<Self> {
+    fn slam(
+        &self,
+        ident: Identifier,
+        body: Analysis<Self>,
+        _ty: &Type,
+    ) -> Analysis<Self> {
         let mut body_sem = match body {
             Canonical(c) => c,
             _ => return body,
@@ -80,7 +85,12 @@ impl Language for Polynomials {
         Canonical(body_sem)
     }
 
-    fn sapp(&self, fun: Analysis<Self>, arg: Analysis<Self>) -> Analysis<Self> {
+    fn sapp(
+        &self,
+        fun: Analysis<Self>,
+        arg: Analysis<Self>,
+        _: &Type,
+    ) -> Analysis<Self> {
         let fun_sem = match fun {
             Canonical(c) => c,
             _ => return fun,

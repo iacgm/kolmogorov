@@ -4,9 +4,10 @@ mod languages;
 use languages::*;
 
 fn main() {
-    let lang = LogicLang::new(1);
+    let lang = Empty;
 
-    let ty = ty!(N => Bool);
+    // Exam Q 3(d) from Lambda Calculus & Types 2024 Exam Paper
+    let ty = ty!((((A => B) => B) => B) => A => B);
 
     for n in 1.. {
         println!("Round {}", n);
