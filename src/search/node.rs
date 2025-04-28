@@ -68,7 +68,9 @@ impl<L: Language> Node<L> {
 
             match self {
                 Cached { list, next } => match list.pop() {
-                    Some(x) => return Some(x),
+                    Some(x) => {
+                        return Some(x);
+                    }
                     None => {
                         let next = std::mem::replace(next.as_mut(), Nil);
                         *self = next;

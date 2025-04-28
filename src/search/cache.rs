@@ -16,7 +16,6 @@ pub enum SearchResult<L: Language> {
     Unknown,
     Inhabited {
         cache: Vec<Analyzed<L>>,
-        count: usize,
         state: Option<Box<Node<L>>>,
     },
     Empty,
@@ -90,7 +89,9 @@ impl<L: Language> Cache<L> {
 
                 let rest = core(dict, targ, ret, size - n - 1);
 
-                if arg_res.unknown() && !rest.empty() || arg_res.inhabited() && rest.unknown() {
+                if (arg_res.unknown() && !rest.empty())
+                    || (arg_res.inhabited() && rest.unknown())
+                {
                     res = Unknown;
                     continue;
                 }
@@ -200,7 +201,6 @@ impl<L: Language> SearchResult<L> {
     pub fn large() -> Self {
         Inhabited {
             cache: vec![],
-            count: 0,
             state: None,
         }
     }
@@ -216,37 +216,21 @@ impl<L: Language> SearchResult<L> {
             Unknown if CACHE_SIZE != 0 => {
                 *self = Inhabited {
                     cache: vec![(term.clone(), analysis.clone())],
-                    count: 1,
                     state: node.map(|n| n.clone().into()),
                 }
             }
-            Inhabited {
-                cache,
-                count,
-                state,
-            } if (1..CACHE_SIZE).contains(count) => {
+            Inhabited { cache, .. }
+                if cache.len() >= CACHE_SIZE
+                    || cache.iter().any(|t| &t.0 == term) => {}
+            Inhabited { cache, state }
+                if (1..CACHE_SIZE).contains(&cache.len()) =>
+            {
                 cache.push((term.clone(), analysis.clone()));
-                *count += 1;
-                let new_node = node.map(|n| Box::new(n.clone()));
-                if let Some(node) = new_node {
-                    *state = Some(node);
+                if node.is_some() {
+                    *state = node.map(|n| Box::new(n.clone()));
                 }
             }
-            Inhabited {
-                cache,
-                state,
-                count,
-            } if *count == CACHE_SIZE => {
-                *cache = vec![];
-                *count += 1;
-                let new_node = node.map(|n| Box::new(n.clone()));
-                if let Some(node) = new_node {
-                    *state = Some(node);
-                }
-            }
-            Inhabited { count, .. } if *count > CACHE_SIZE => {
-                *count += 1;
-            }
+            Inhabited { .. } => {}
             _ => {
                 unreachable!()
             }
