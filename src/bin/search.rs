@@ -7,7 +7,7 @@ fn main() {
     let lang = NumLogic::new(1);
     let ty = ty!(Var => Bool);
 
-    for n in 1.. {
+    for n in 2.. {
         let start = std::time::Instant::now();
 
         let searcher =
