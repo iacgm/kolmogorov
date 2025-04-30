@@ -3,7 +3,10 @@ use std::{
     hash::Hash,
 };
 
-pub trait Semantics: Debug + Clone + Eq + Hash + Display + Sized {}
+pub trait Semantics:
+    Debug + Clone + PartialEq + Eq + Hash + Display + Sized
+{
+}
 
 impl<T: Debug + Clone + Eq + Hash + Display + Sized> Semantics for T {}
 

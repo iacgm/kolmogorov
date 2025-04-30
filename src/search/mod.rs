@@ -65,7 +65,7 @@ struct SearchContext<'a, L: Language> {
     cache: Cache<L>,
 }
 
-impl<'a, L: Language> SearchContext<'a, L> {
+impl<L: Language> SearchContext<'_, L> {
     fn contains_var_of_type(&self, ty: &Rc<Type>) -> bool {
         let args = self.args.iter().map(|(_, t)| t);
         let ctxt = self.ctxt.iter().map(|(_, b)| &b.ty);
@@ -103,7 +103,7 @@ impl<'a, L: Language> SearchContext<'a, L> {
     }
 }
 
-impl<'a, L: Language> Iterator for Enumerator<'a, L> {
+impl<L: Language> Iterator for Enumerator<'_, L> {
     type Item = (Term, Analysis<L>);
 
     fn next(&mut self) -> Option<Self::Item> {

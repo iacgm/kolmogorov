@@ -245,7 +245,7 @@ impl<L: Language> Node<L> {
                         }
                     }
 
-                    let analysis = search_ctxt.lang.svar(var, targ);
+                    let analysis = search_ctxt.lang.svar(var, &v_ty);
 
                     *state = Some(Box::new(Arg {
                         targ: targ.clone(),

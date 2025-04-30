@@ -4,11 +4,11 @@ mod languages;
 use languages::*;
 
 fn main() {
-    let lang = LogicLang::new(1);
+    let lang = NumLogic::new(1);
 
-    let ty = ty!(N => Bool);
+    let ty = ty!(Var => Bool);
 
-    for n in 6.. {
+    for n in 1.. {
         println!("Round {}", n);
         let start = std::time::Instant::now();
 

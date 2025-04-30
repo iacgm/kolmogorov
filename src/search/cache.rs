@@ -221,7 +221,7 @@ impl<L: Language> SearchResult<L> {
             }
             Inhabited { cache, .. }
                 if cache.len() >= CACHE_SIZE
-                    || cache.iter().any(|t| &t.0 == term) => {}
+                    || cache.iter().any(|t| t.1 == analysis) => {}
             Inhabited { cache, state }
                 if (1..CACHE_SIZE).contains(&cache.len()) =>
             {

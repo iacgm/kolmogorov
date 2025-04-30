@@ -2,8 +2,11 @@ use super::*;
 
 use std::fmt::*;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum Analysis<L: Language> {
+#[derive(Clone, Debug)]
+pub enum Analysis<L: Language>
+where
+    L::Semantics: Semantics,
+{
     Malformed, // Reject Term entirely (i.e, unnecessarily complex)
     Unique,    // Allow, but did not construct canonical form
     Canonical(L::Semantics), // Group into equivalence class by canonical form
@@ -72,6 +75,17 @@ where
             Unique => write!(f, "Unique"),
             Malformed => write!(f, "Malformed"),
             Canonical(sem) => write!(f, "Canonical({})", sem),
+        }
+    }
+}
+
+impl<L: Language> PartialEq for Analysis<L> {
+    fn eq(&self, other: &Self) -> bool {
+        use Analysis::*;
+        match (self, other) {
+            (Unique, Unique) | (Malformed, Malformed) => true,
+            (Canonical(l), Canonical(r)) => l == r,
+            _ => false,
         }
     }
 }
