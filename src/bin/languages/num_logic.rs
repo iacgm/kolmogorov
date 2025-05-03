@@ -56,8 +56,8 @@ impl Language for NumLogic {
     // We track semantics AND the depth of each subterm
     type Semantics = NumLogicSems;
 
-    const SMALL_SIZE: usize = 10;
-    const LARGE_SIZE: usize = 18;
+    const SMALL_SIZE: usize = 15;
+    const LARGE_SIZE: usize = 30;
 
     fn context(&self) -> Context {
         self.context.clone()
@@ -158,7 +158,9 @@ impl Language for NumLogic {
                     unreachable!()
                 };
 
-                And(vec![(false, Eq(p, q))])
+                let eq = if p <= q { Eq(p, q) } else { Eq(q, p) };
+
+                And(vec![(false, eq)])
             }
             App(v, mut args) if v.as_str() == "divisor" && args.len() == 1 => {
                 let (Sum(p), Sum(q)) = (args.remove(0), arg) else {
@@ -233,7 +235,7 @@ impl NumLogic {
 
         let pow = builtin! {
             Var => Var => Val
-            |c, p| => Term::val(int(&c).pow(int(&p)))
+            |c, p| => Term::val(int(&c).checked_pow(int(&p)).unwrap_or(0))
         };
 
         let add = builtin! {
@@ -242,9 +244,9 @@ impl NumLogic {
         };
 
         let exists = builtin! {
-            Var => (Val => Bool) => Bool
+            Var => (Var => Bool) => Bool
             ctxt |b, f| => {
-                Term::val((1..int(&b)).any(|n| bln(&ctxt.evaluate(&term!([f] [:n])))))
+                Term::val((1..=int(&b)).any(|n| bln(&ctxt.evaluate(&term!([f] [:n])))))
             }
         };
 

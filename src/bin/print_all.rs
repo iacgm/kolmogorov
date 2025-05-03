@@ -4,15 +4,15 @@ mod languages;
 use languages::*;
 
 fn main() {
-    let lang = NumLogic::new(1);
+    let lang = NumLogic::new(2);
 
     let ty = ty!(Var => Bool);
 
-    for n in 1.. {
+    for n in 25.. {
         println!("Round {}", n);
         let start = std::time::Instant::now();
 
-        let searcher = search(&lang, vec![("n".into(), ty!(N).into())], &ty, n);
+        let searcher = search(&lang, vec![], &ty, n);
 
         let mut count = 0;
 
@@ -23,6 +23,7 @@ fn main() {
                 println!("≈ {}", sem);
             }
         }
+
         println!();
 
         println!(
