@@ -15,12 +15,12 @@ pub struct NumLogic {
 type Var = Identifier;
 
 #[derive(PartialOrd, PartialEq, Eq, Ord, Clone, Hash, Debug)]
-pub enum AtomicVal {
+pub enum Atom {
     Var(Var),
     Pow(Var, Var),
 }
 
-type Sum = Vec<AtomicVal>;
+type Sum = Vec<Atom>;
 
 // An atomic formula
 #[derive(Debug, Ord, PartialOrd, Clone, PartialEq, Eq, Hash)]
@@ -37,7 +37,16 @@ type Literal = (bool, Predicate);
 type Conjunction = Vec<Literal>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Exists {
+pub enum Reducer {
+    Existential,
+    Universal,
+    Sigma,
+    Count,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Reduction {
+    reducer: Reducer,
     var: Identifier,
     bound: Var,
     body: Rc<NumLogicSems>,
@@ -46,9 +55,9 @@ pub struct Exists {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum NumLogicSems {
     Sum(Sum),
-    And(Conjunction), // A conjunction of Literals
+    And(Conjunction),                   // A conjunction of Literals
     App(Identifier, Vec<NumLogicSems>), // Variables are not analyzed until they are contextualized
-    Any(Exists),
+    Red(Reduction),
     Abs(Identifier, Rc<NumLogicSems>),
 }
 
@@ -65,14 +74,14 @@ impl Language for NumLogic {
 
     fn svar(&self, v: Identifier, ty: &Type) -> Analysis<Self> {
         use Analysis::*;
-        use AtomicVal::*;
+        use Atom::*;
         use Identifier::*;
         use NumLogicSems::*;
 
         match ty {
             // Disallow function variables
             Type::Fun(_, _) if self.context.get(v).is_none() => Malformed,
-            Type::Var(Name("Val" | "Var")) => Canonical(Sum(vec![Var(v)])),
+            Type::Var(Name("Atom" | "Var")) => Canonical(Sum(vec![Var(v)])),
             _ => Canonical(App(v, vec![])),
         }
     }
@@ -81,12 +90,7 @@ impl Language for NumLogic {
         unimplemented!()
     }
 
-    fn slam(
-        &self,
-        ident: Identifier,
-        body: Analysis<Self>,
-        ty: &Type,
-    ) -> Analysis<Self> {
+    fn slam(&self, ident: Identifier, body: Analysis<Self>, ty: &Type) -> Analysis<Self> {
         use Analysis::*;
         use NumLogicSems::*;
 
@@ -101,14 +105,9 @@ impl Language for NumLogic {
         Canonical(Abs(ident, Rc::new(body.canon())))
     }
 
-    fn sapp(
-        &self,
-        fun: Analysis<Self>,
-        arg: Analysis<Self>,
-        _ty: &Type,
-    ) -> Analysis<Self> {
+    fn sapp(&self, fun: Analysis<Self>, arg: Analysis<Self>, _ty: &Type) -> Analysis<Self> {
         use Analysis::*;
-        use AtomicVal::*;
+        use Atom::*;
         use NumLogicSems::*;
         use Predicate::*;
 
@@ -116,7 +115,7 @@ impl Language for NumLogic {
         let arg = arg.canon();
 
         let sems = match fun {
-            App(v, args) if v.as_str() == "cast" => {
+            App(v, args) if v.as_str() == "atom" => {
                 debug_assert!(args.is_empty());
                 arg
             }
@@ -137,7 +136,7 @@ impl Language for NumLogic {
 
                 Sum(vec![Pow(b, k)])
             }
-            App(v, mut args) if v.as_str() == "+" && args.len() == 1 => {
+            App(v, mut args) if v.as_str() == "add" && args.len() == 1 => {
                 let (Sum(mut l), Sum(r)) = (args.remove(0), arg) else {
                     unreachable!()
                 };
@@ -180,7 +179,7 @@ impl Language for NumLogic {
 
                 And(bools)
             }
-            App(v, mut args) if v.as_str() == "exists" && args.len() == 1 => {
+            App(v, mut args) if ["sigma", "count", "exists", "forall"].contains(&v.as_str()) && args.len() == 1 => {
                 let Sum(mut sum) = args.remove(0) else {
                     unreachable!()
                 };
@@ -196,7 +195,17 @@ impl Language for NumLogic {
                     return Malformed;
                 }
 
-                Any(Exists {
+                use Reducer::*;
+                let reducer = match v.as_str() {
+                    "exists" => Existential,
+                    "forall" => Universal,
+                    "sigma" => Sigma,
+                    "count" => Count,
+                    _ => unreachable!(),
+                };
+
+                Red(Reduction {
+                    reducer,
                     var,
                     bound: limit,
                     body,
@@ -228,19 +237,19 @@ impl NumLogic {
         let int = |t: &Term| t.get::<u32>();
         let bln = |t: &Term| t.get::<bool>();
 
-        let cast = builtin! {
-            Var => Val
-            |v| => Term::val(int(&v))
+        let atom = builtin! {
+            Var => Atom
+            |v| => v.clone()
         };
 
         let pow = builtin! {
-            Var => Var => Val
+            Var => Var => Atom
             |c, p| => Term::val(int(&c).checked_pow(int(&p)).unwrap_or(0))
         };
 
         let add = builtin! {
-            Val => Val => Val
-            |l, r| => Term::val(int(&l) + int(&r))
+            Atom => Atom => Atom
+            |l, r| => Term::val(int(&l).checked_add(int(&r)).unwrap_or(0))
         };
 
         let exists = builtin! {
@@ -250,18 +259,44 @@ impl NumLogic {
             }
         };
 
+        let forall = builtin! {
+            Var => (Var => Bool) => Bool
+            ctxt |b, f| => {
+                Term::val((1..=int(&b)).all(|n| bln(&ctxt.evaluate(&term!([f] [:n])))))
+            }
+        };
+
+        let num = builtin! {
+            Atom => Num
+            |n| => n.clone()
+        };
+
+        let sigma = builtin! {
+            Var => (Var => Num) => Num
+            ctxt |b, f| => {
+                Term::val((1..=int(&b)).filter(|&n| bln(&ctxt.evaluate(&term!([f] [:n])))).sum::<u32>())
+            }
+        };
+
+        let count = builtin! {
+            Var => (Var => Bool) => Num
+            ctxt |b, f| => {
+                Term::val((1..=int(&b)).filter(|&n| bln(&ctxt.evaluate(&term!([f] [:n])))).count())
+            }
+        };
+
         let and = builtin! {
             Bool => Bool => Bool
             |a, b| => Term::val(bln(&a) && bln(&b))
         };
 
         let prime = builtin! {
-            Val => Bool
+            Atom => Bool
             |n| => Term::val(is_prime(int(&n)))
         };
 
         let divisor = builtin! {
-            Val => Val => Bool
+            Atom => Atom => Bool
             |p, q| => {
                 let p = int(&p);
                 let q = int(&q);
@@ -270,19 +305,23 @@ impl NumLogic {
         };
 
         let eq = builtin! {
-            Val => Val => Bool
+            Atom => Atom => Bool
             |l, r| => Term::val(int(&l) == int(&r))
         };
 
         let less = builtin! {
-            Val => Val => Bool
+            Atom => Atom => Bool
             |l, r| => Term::val(int(&l) < int(&r))
         };
 
         vec![
-            ("cast".into(), cast),
+            ("num".into(), num),
+            ("atom".into(), atom),
             ("pow".into(), pow),
-            ("+".into(), add),
+            ("add".into(), add),
+            ("count".into(), count),
+            ("sigma".into(), sigma),
+            ("forall".into(), forall),
             ("eq".into(), eq),
             ("less".into(), less),
             ("exists".into(), exists),
@@ -297,10 +336,8 @@ impl NumLogicSems {
     pub fn depth(&self) -> usize {
         use NumLogicSems::*;
         match self {
-            Any(Exists { body, .. }) => body.depth() + 1,
-            App(_, args) => {
-                args.iter().map(NumLogicSems::depth).max().unwrap_or(0)
-            }
+            Red(Reduction { body, .. }) => body.depth() + 1,
+            App(_, args) => args.iter().map(NumLogicSems::depth).max().unwrap_or(0),
             _ => 0,
         }
     }
@@ -319,11 +356,11 @@ fn is_prime(n: u32) -> bool {
     true
 }
 
-impl Display for AtomicVal {
+impl Display for Atom {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            AtomicVal::Var(identifier) => write!(f, "{}", identifier),
-            AtomicVal::Pow(identifier, identifier1) => {
+            Atom::Var(identifier) => write!(f, "{}", identifier),
+            Atom::Pow(identifier, identifier1) => {
                 write!(f, "({}^{})", identifier, identifier1)
             }
         }
@@ -387,9 +424,6 @@ impl Display for NumLogicSems {
                 }
                 Ok(())
             }
-            Any(exists) => {
-                write!(f, "∃{}<{} [{}]", exists.var, exists.bound, exists.body)
-            }
             Abs(identifier, body) => {
                 write!(f, "({} ", identifier)?;
                 let mut next = body;
@@ -398,6 +432,22 @@ impl Display for NumLogicSems {
                     next = body;
                 }
                 write!(f, "-> {})", next)
+            }
+            Red(reduction) => {
+                use Reducer::*;
+                write!(
+                    f,
+                    "{}{}<{} [{}]",
+                    match reduction.reducer {
+                        Sigma => "Σ",
+                        Count => "#",
+                        Existential => "∃",
+                        Universal => "∀",
+                    },
+                    reduction.var,
+                    reduction.bound,
+                    reduction.body
+                )
             }
         }
     }

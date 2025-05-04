@@ -10,6 +10,7 @@ pub(super) enum Node<L: Language> {
         size: usize,
         phase: AllPhase,
         state: Option<Box<Node<L>>>,
+        depth: Option<usize>,
     },
     Abs {
         targ: Rc<Type>,
@@ -22,6 +23,7 @@ pub(super) enum Node<L: Language> {
         size: usize,
         vars: VarsVec,
         state: Option<Box<Node<L>>>,
+        depth: usize,
     },
     Arg {
         targ: Rc<Type>,
@@ -29,13 +31,10 @@ pub(super) enum Node<L: Language> {
         l_ty: Rc<Type>,
         left: Thunk,
         left_analysis: Analysis<L>,
-        res: SearchResult<L>,
+        res: SearchResult,
         state: Option<Box<Node<L>>>,
         arg_state: Option<Box<Node<L>>>,
-    },
-    Cached {
-        list: Vec<(Term, Analysis<L>)>,
-        next: Box<Node<L>>,
+        depth: usize,
     },
     Nil,
 }
@@ -46,7 +45,6 @@ pub(super) enum AllPhase {
     Application,
     Abstraction,
     Completed,
-    CacheCompleted,
 }
 
 impl AllPhase {
@@ -54,10 +52,7 @@ impl AllPhase {
 }
 
 impl<L: Language> Node<L> {
-    pub fn next(
-        &mut self,
-        search_ctxt: &mut SearchContext<L>,
-    ) -> Option<(Term, Analysis<L>)> {
+    pub fn next(&mut self, search_ctxt: &mut SearchContext<L>) -> Option<(Term, Analysis<L>)> {
         use Node::*;
         loop {
             #[cfg(feature = "fulltrace")]
@@ -67,22 +62,12 @@ impl<L: Language> Node<L> {
             }
 
             match self {
-                Cached { list, next } => match list.pop() {
-                    Some(x) => {
-                        return Some(x);
-                    }
-                    None => {
-                        let next = std::mem::replace(next.as_mut(), Nil);
-                        *self = next;
-                        self.late_start(search_ctxt);
-                        continue;
-                    }
-                },
                 All {
                     targ,
                     size,
                     phase,
                     state,
+                    depth,
                 } => {
                     let size = *size;
 
@@ -93,22 +78,13 @@ impl<L: Language> Node<L> {
                     if let Some(curr_state) = state {
                         match curr_state.next(search_ctxt) {
                             Some((term, analysis)) => {
-                                let this = All {
-                                    targ: targ.clone(),
+                                if let Some(term) = search_ctxt.cache.yield_term(
+                                    targ,
                                     size,
-                                    phase: *phase,
-                                    state: state.clone(),
-                                };
-
-                                if let Some(term) =
-                                    search_ctxt.cache.yield_term(
-                                        targ,
-                                        size,
-                                        Some(&this),
-                                        term,
-                                        analysis.clone(),
-                                    )
-                                {
+                                    term,
+                                    analysis.clone(),
+                                    depth.unwrap(),
+                                ) {
                                     return Some((term, analysis));
                                 } else {
                                     continue;
@@ -122,24 +98,10 @@ impl<L: Language> Node<L> {
                     match phase {
                         CacheCheck => {
                             match search_ctxt.cache.prune(targ, size) {
-                                Inhabited {
-                                    cache,
-                                    state: cache_state,
-                                    ..
-                                } if !cache.is_empty() => {
-                                    *phase = CacheCompleted;
-                                    *state = Some(Box::new(Cached {
-                                        list: cache.clone(),
-                                        next: cache_state
-                                            .clone()
-                                            .unwrap_or(Nil.into()),
-                                    }));
-                                    continue;
-                                }
                                 Empty => return None,
                                 _ => *phase = Application,
                             }
-                            search_ctxt.cache.begin_search(targ, size);
+                            *depth = Some(search_ctxt.cache.begin_search(targ, size));
                             continue;
                         }
                         Application => {
@@ -149,6 +111,7 @@ impl<L: Language> Node<L> {
                                 size,
                                 state: None,
                                 vars: search_ctxt.vars_producing(targ),
+                                depth: depth.unwrap(),
                             }))
                         }
                         Abstraction => {
@@ -165,9 +128,6 @@ impl<L: Language> Node<L> {
                             search_ctxt.cache.end_search(search);
                             return None;
                         }
-                        CacheCompleted => {
-                            return None;
-                        }
                     };
                 }
 
@@ -182,17 +142,14 @@ impl<L: Language> Node<L> {
                         return None;
                     };
 
-                    let ident = *ident
-                        .get_or_insert_with(|| search_ctxt.vgen.small_var());
+                    let ident = *ident.get_or_insert_with(|| search_ctxt.vgen.small_var());
 
                     if let Some(curr_state) = state {
                         return match curr_state.next(search_ctxt) {
                             Some((term, analysis)) => {
                                 let term = Term::Lam(ident, term.into());
 
-                                let analysis = search_ctxt
-                                    .lang
-                                    .slam(ident, analysis, targ);
+                                let analysis = search_ctxt.lang.slam(ident, analysis, targ);
                                 Some((term, analysis))
                             }
                             None => {
@@ -214,6 +171,7 @@ impl<L: Language> Node<L> {
                         size: *size - 1,
                         state: None,
                         phase: AllPhase::START,
+                        depth: None,
                     }));
                 }
 
@@ -222,6 +180,7 @@ impl<L: Language> Node<L> {
                     size,
                     vars,
                     state,
+                    depth
                 } => {
                     if let Some(curr_state) = state {
                         match curr_state.next(search_ctxt) {
@@ -233,13 +192,11 @@ impl<L: Language> Node<L> {
                     let (var, v_ty) = vars.pop()?;
 
                     let size = *size;
+                    let depth = *depth;
 
                     if size == 1 {
                         if v_ty == *targ {
-                            return Some((
-                                Term::Var(var),
-                                search_ctxt.lang.svar(var, targ),
-                            ));
+                            return Some((Term::Var(var), search_ctxt.lang.svar(var, targ)));
                         } else {
                             continue;
                         }
@@ -256,6 +213,7 @@ impl<L: Language> Node<L> {
                         state: None,
                         arg_state: None,
                         res: Unknown,
+                        depth,
                     }));
                 }
 
@@ -268,6 +226,7 @@ impl<L: Language> Node<L> {
                     state,
                     arg_state,
                     res,
+                    depth,
                 } => {
                     if let Some(curr_state) = state {
                         match curr_state.next(search_ctxt) {
@@ -277,6 +236,7 @@ impl<L: Language> Node<L> {
                     };
 
                     let size = *size;
+                    let depth = *depth;
                     if size == 1 {
                         *self = Nil;
                         return None;
@@ -297,10 +257,7 @@ impl<L: Language> Node<L> {
                             unreachable!()
                         };
 
-                        return Some((
-                            left.borrow().clone(),
-                            left_analysis.clone(),
-                        ));
+                        return Some((left.borrow().clone(), left_analysis.clone()));
                     } else if size == 0 || targ == l_ty {
                         *self = Nil;
                         return None;
@@ -314,7 +271,6 @@ impl<L: Language> Node<L> {
                         *res = search_ctxt.cache.prune_arg(targ, l_ty, size);
 
                         if res.empty() {
-                            self.early_exit(search_ctxt);
                             *self = Nil;
                             return None;
                         }
@@ -326,14 +282,14 @@ impl<L: Language> Node<L> {
                             // If applying one arg yields target type, we skip straight to
                             // the largest possible arg. Otherwise start searching args of
                             // all sizes, starting from 1.
-                            let arg_size =
-                                if ret_ty == targ { size - 1 } else { 1 };
+                            let arg_size = if ret_ty == targ { size - 1 } else { 1 };
 
                             *arg_state = Some(Box::new(All {
                                 targ: arg_ty.clone(),
                                 size: arg_size,
                                 state: None,
                                 phase: AllPhase::START,
+                                depth: None,
                             }));
 
                             arg_state.as_mut().unwrap()
@@ -367,19 +323,18 @@ impl<L: Language> Node<L> {
                         *state = None;
                     };
 
-                    let analysis = search_ctxt.lang.sapp(
-                        left_analysis.clone(),
-                        arg_analysis,
-                        targ,
-                    );
+                    let analysis = search_ctxt
+                        .lang
+                        .sapp(left_analysis.clone(), arg_analysis, targ);
                     let left = Term::App(left.clone(), arg.into());
 
                     if let Some(term) = search_ctxt.cache.yield_term(
                         ret_ty,
                         left.size(),
-                        None,
                         left,
                         analysis.clone(),
+                        depth
+
                     ) {
                         *state = Some(Box::new(Arg {
                             targ: targ.clone(),
@@ -390,79 +345,12 @@ impl<L: Language> Node<L> {
                             state: None,
                             arg_state: None,
                             res: Unknown,
+                            depth,
                         }))
                     }
                 }
                 Nil => return None,
             }
-        }
-    }
-
-    // Used to initialize a search at an arbitrary node (to skip ahead in caching)
-    pub fn late_start(&self, search_ctxt: &mut SearchContext<L>) {
-        use Node::*;
-        match self {
-            All {
-                targ, size, state, ..
-            } => {
-                search_ctxt.cache.begin_search(targ, *size);
-                if let Some(state) = state.as_ref() {
-                    state.late_start(search_ctxt);
-                }
-            }
-            Abs {
-                state: Some(state), ..
-            }
-            | Var {
-                state: Some(state), ..
-            } => state.late_start(search_ctxt),
-            Arg {
-                state, arg_state, ..
-            } => {
-                if let Some(state) = arg_state.as_ref() {
-                    state.late_start(search_ctxt);
-                }
-                if let Some(state) = state.as_ref() {
-                    state.late_start(search_ctxt);
-                }
-            }
-            _ => {}
-        }
-    }
-
-    //Used to end a search early (if pruning indicates emptiness)
-    pub fn early_exit(&mut self, search_ctxt: &mut SearchContext<L>) {
-        use Node::*;
-        match self {
-            All {
-                state, targ, size, ..
-            } => {
-                if let Some(state) = state.take().as_mut() {
-                    state.early_exit(search_ctxt);
-                }
-
-                let search = (targ.clone(), *size);
-                search_ctxt.cache.end_search(search);
-            }
-            Abs {
-                state: Some(state), ..
-            }
-            | Var {
-                state: Some(state), ..
-            } => {
-                state.early_exit(search_ctxt);
-            }
-            Arg {
-                state, arg_state, ..
-            } => {
-                if let Some(state) = state.take().as_mut() {
-                    state.early_exit(search_ctxt);
-                }
-                if let Some(state) = arg_state.take().as_mut() {
-                    state.early_exit(search_ctxt);
-                }
-            }
-            _ => {}
         }
     }
 }
@@ -478,25 +366,12 @@ impl<L: Language + Debug> Display for Node<L> {
 
         use Node::*;
         let out = match self {
-            Cached { list, next } => {
-                write!(f, "{:indent$}Cached: [", "")?;
-                for (t, a) in list {
-                    write!(f, "({} ≈ {}),", t, a)?;
-                }
-                writeln!(f, "]")?;
-                write!(
-                    f,
-                    "\n{:indent$}next_state:\n{}",
-                    "",
-                    next,
-                    indent = indent
-                )
-            }
             All {
                 targ,
                 size,
                 phase,
                 state,
+                ..
             } => {
                 write!(
                     f,
@@ -539,6 +414,7 @@ impl<L: Language + Debug> Display for Node<L> {
                 size,
                 vars,
                 state,
+                ..
             } => {
                 write!(
                     f,
@@ -564,6 +440,7 @@ impl<L: Language + Debug> Display for Node<L> {
                 res,
                 state,
                 arg_state,
+                ..
             } => {
                 write!(
                     f,
@@ -578,24 +455,12 @@ impl<L: Language + Debug> Display for Node<L> {
                     indent = indent
                 )?;
                 if let Some(state) = state {
-                    write!(
-                        f,
-                        "\n{:indent$}state:\n{}",
-                        "",
-                        state,
-                        indent = indent
-                    )?;
+                    write!(f, "\n{:indent$}state:\n{}", "", state, indent = indent)?;
                 } else {
                     writeln!(f, "Nil ")?;
                 }
                 if let Some(state) = arg_state {
-                    write!(
-                        f,
-                        "\n{:indent$}arg_state:\n{}",
-                        "",
-                        state,
-                        indent = indent
-                    )
+                    write!(f, "\n{:indent$}arg_state:\n{}", "", state, indent = indent)
                 } else {
                     writeln!(f, "Nil")
                 }

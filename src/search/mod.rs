@@ -44,6 +44,7 @@ pub fn search<'a, L: Language>(
             size,
             state: None,
             phase: AllPhase::START,
+            depth: None
         },
     }
 }
@@ -74,6 +75,7 @@ impl<L: Language> SearchContext<'_, L> {
     }
 
     fn vars_producing(&mut self, targ: &Rc<Type>) -> VarsVec {
+
         fn produces(ty: &Type, target: &Type) -> bool {
             let ret_ty_produces = match ty {
                 Type::Fun(_, r) => produces(r, target),

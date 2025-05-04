@@ -2,27 +2,20 @@ use super::*;
 
 use rustc_hash::FxHashMap as HashMap;
 
-const CACHE_SIZE: usize = 8;
-
 type Search = (Rc<Type>, usize);
-type Analyzed<L> = (Term, Analysis<L>);
-type PathDict<L> = HashMap<Search, SearchResult<L>>;
-type SemanticDict<L> =
-    HashMap<(<L as Language>::Semantics, Type), (Term, usize)>;
+type PathDict = HashMap<Search, SearchResult>;
+type SemanticDict<L> = HashMap<(<L as Language>::Semantics, Type), (Term, usize)>;
 
 #[derive(Debug, Default, Clone)]
-pub enum SearchResult<L: Language> {
+pub enum SearchResult {
     #[default]
     Unknown,
-    Inhabited {
-        cache: Vec<Analyzed<L>>,
-        state: Option<Box<Node<L>>>,
-    },
+    Inhabited,
     Empty,
 }
 
 pub struct Cache<L: Language> {
-    paths: Vec<PathDict<L>>,
+    paths: Vec<PathDict>,
     // Minimal sizes of representations of constants
     consts: Vec<SemanticDict<L>>,
 }
@@ -46,28 +39,23 @@ impl<L: Language> Cache<L> {
         self.consts.pop();
     }
 
-    pub fn prune(&self, targ: &Rc<Type>, size: usize) -> &SearchResult<L> {
+    pub fn prune(&self, targ: &Rc<Type>, size: usize) -> &SearchResult {
         let search = (targ.clone(), size);
 
         self.active().get(&search).unwrap_or(&Unknown)
     }
 
-    pub fn prune_arg(
-        &self,
-        targ: &Rc<Type>,
-        l_ty: &Rc<Type>,
-        size: usize,
-    ) -> SearchResult<L> {
+    pub fn prune_arg(&self, targ: &Rc<Type>, l_ty: &Rc<Type>, size: usize) -> SearchResult {
         fn core<L: Language>(
-            dict: &PathDict<L>,
+            dict: &PathDict,
             targ: &Rc<Type>,
             l_ty: &Rc<Type>,
             size: usize,
-        ) -> SearchResult<L> {
+        ) -> SearchResult {
             let done = l_ty == targ;
 
             if size == 0 && done {
-                return SearchResult::large();
+                return SearchResult::Inhabited;
             }
 
             if size == 0 || done {
@@ -87,17 +75,15 @@ impl<L: Language> Cache<L> {
                     continue;
                 }
 
-                let rest = core(dict, targ, ret, size - n - 1);
+                let rest = core::<L>(dict, targ, ret, size - n - 1);
 
-                if (arg_res.unknown() && !rest.empty())
-                    || (arg_res.inhabited() && rest.unknown())
-                {
+                if (arg_res.unknown() && !rest.empty()) || (arg_res.inhabited() && rest.unknown()) {
                     res = Unknown;
                     continue;
                 }
 
                 if arg_res.inhabited() && rest.inhabited() {
-                    res = SearchResult::large();
+                    res = SearchResult::Inhabited;
                     break;
                 }
             }
@@ -105,22 +91,25 @@ impl<L: Language> Cache<L> {
             res
         }
 
-        core(self.active(), targ, l_ty, size)
+        core::<L>(self.active(), targ, l_ty, size)
     }
 
-    pub fn begin_search(&mut self, targ: &Rc<Type>, size: usize) {
+    // Returns index of search for logging
+    pub fn begin_search(&mut self, targ: &Rc<Type>, size: usize) -> usize {
         let search = (targ.clone(), size);
 
         self.active_mut().entry(search).or_insert(Unknown);
+
+        self.paths.len() - 1
     }
 
     pub fn yield_term(
         &mut self,
         targ: &Rc<Type>,
         size: usize,
-        node: Option<&Node<L>>,
         term: Term,
         analysis: Analysis<L>,
+        depth: usize,
     ) -> Option<Term> {
         use Analysis::*;
         match &analysis {
@@ -139,9 +128,7 @@ impl<L: Language> Cache<L> {
                         let (minimal, m_size) = entry.get();
 
                         // Need the second check because we generate the same term several times
-                        if *m_size < size
-                            || (*m_size == size && &term != minimal)
-                        {
+                        if *m_size < size || (*m_size == size && &term != minimal) {
                             return None;
                         } else {
                             *entry.get_mut() = (term.clone(), size);
@@ -154,12 +141,10 @@ impl<L: Language> Cache<L> {
             }
         }
 
-        let search = (targ.clone(), size);
-
-        self.active_mut()
-            .entry(search)
-            .or_insert(Unknown)
-            .log(node, &term, analysis);
+        for dict in &mut self.paths[depth..] {
+            let search = (targ.clone(), size);
+            dict.entry(search).or_insert(Unknown).log();
+        }
 
         Some(term)
     }
@@ -188,53 +173,19 @@ impl<L: Language> Cache<L> {
         }
     }
 
-    pub fn active(&self) -> &PathDict<L> {
+    pub fn active(&self) -> &PathDict {
         self.paths.last().unwrap()
     }
 
-    fn active_mut(&mut self) -> &mut PathDict<L> {
+    fn active_mut(&mut self) -> &mut PathDict {
         self.paths.last_mut().unwrap()
     }
 }
 
-impl<L: Language> SearchResult<L> {
-    pub fn large() -> Self {
-        Inhabited {
-            cache: vec![],
-            state: None,
-        }
-    }
-
+impl SearchResult {
     //Add to space
-    pub fn log(
-        &mut self,
-        node: Option<&Node<L>>,
-        term: &Term,
-        analysis: Analysis<L>,
-    ) {
-        match self {
-            Unknown if CACHE_SIZE != 0 => {
-                *self = Inhabited {
-                    cache: vec![(term.clone(), analysis.clone())],
-                    state: node.map(|n| n.clone().into()),
-                }
-            }
-            Inhabited { cache, .. }
-                if cache.len() >= CACHE_SIZE
-                    || cache.iter().any(|t| t.1 == analysis) => {}
-            Inhabited { cache, state }
-                if (1..CACHE_SIZE).contains(&cache.len()) =>
-            {
-                cache.push((term.clone(), analysis.clone()));
-                if node.is_some() {
-                    *state = node.map(|n| Box::new(n.clone()));
-                }
-            }
-            Inhabited { .. } => {}
-            _ => {
-                unreachable!()
-            }
-        }
+    pub fn log(&mut self) {
+        *self = Inhabited;
     }
 
     pub fn unknown(&self) -> bool {
@@ -246,6 +197,6 @@ impl<L: Language> SearchResult<L> {
     }
 
     pub fn inhabited(&self) -> bool {
-        matches!(self, Inhabited { .. })
+        matches!(self, Inhabited)
     }
 }

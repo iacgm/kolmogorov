@@ -7,7 +7,7 @@ fn main() {
     let lang = NumLogic::new(2);
     let ty = ty!(Var => Bool);
 
-    for n in 2.. {
+    for n in 1.. {
         let start = std::time::Instant::now();
 
         let searcher = search::search(&lang, vec![], &ty, n);

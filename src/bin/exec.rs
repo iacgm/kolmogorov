@@ -6,8 +6,12 @@ use languages::*;
 fn main() {
     let lang = NumLogic::new(2);
 
-    let term = term!(f -> exists f (p -> exists f (n -> and (prime (cast p)) (eq (cast f) (pow p n)))));
+    let inner = term!(p -> exists f (n -> and (prime (atom p)) (eq (atom f) (pow p n)))); 
 
+    let term = term!(f -> exists f [inner]);
+
+
+    dbg!(inner.size());
     dbg!(term.size());
 
     let nps = [
