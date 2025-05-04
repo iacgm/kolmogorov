@@ -29,8 +29,19 @@ impl<L: Language> Cache<L> {
         }
     }
 
-    pub fn intro_var(&mut self, _is_new: bool) {
-        self.paths.push(Default::default());
+    pub fn intro_var(&mut self, is_new: bool) {
+        use SearchResult::*;
+        let mut paths = PathDict::default();
+
+        for (search, result) in self.active() {
+            if result.inhabited() {
+                paths.insert(search.clone(), Inhabited);
+            } else if !is_new && result.empty() {
+                paths.insert(search.clone(), Empty);
+            }
+        }
+
+        self.paths.push(paths);
         self.consts.push(Default::default());
     }
 

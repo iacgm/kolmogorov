@@ -6,26 +6,20 @@ use languages::*;
 fn main() {
     let lang = NumLogic::new(2);
 
-    let inner = term!(p -> exists f (n -> and (prime (atom p)) (eq (atom f) (pow p n)))); 
-
-    let term = term!(f -> exists f [inner]);
-
-
-    dbg!(inner.size());
-    dbg!(term.size());
+    let term = term!(f -> count(f)(k -> (prime(atom(k)))));
 
     let nps = [
-        1, 2, 3, 4, 5, 7, 8, 9, 11, 13, 16, 17, 19, 23, 25, 27, 29, 31, 32, 37,
-        41, 43, 47, 49, 53, 59, 61, 64, 67, 71, 73, 79, 81, 83, 89, 97, 101,
-        103, 107, 109, 113, 121, 125, 127, 128, 131, 137, 139, 149, 151, 157,
-        163, 167, 169, 173, 179, 181, 191, 193, 197, 199, 211, 223, 227,
+        0, 1, 2, 2, 3, 3, 4, 4, 4, 4, 5, 5, 6, 6, 6, 6, 7, 7, 8, 8, 8, 8, 9, 9, 9, 9, 9, 9, 10, 10,
+        11, 11, 11, 11, 11, 11, 12, 12, 12, 12, 13, 13, 14, 14, 14, 14, 15, 15, 15, 15, 15, 15, 16,
+        16, 16, 16, 16, 16, 17, 17, 18, 18, 18, 18, 18, 18, 19, 19, 19, 19, 20, 20, 21, 21, 21, 21,
+        21, 21,
     ];
 
-    for i in 0u32..100 {
+    for i in 2u32..70 {
         let term = term!([term] [:i]);
         let out = lang.context().evaluate(&term);
-        let np = out.get::<bool>();
+        let np = out.get::<u32>();
 
-        assert_eq!(np, nps.contains(&i), "{} -> {}", i, np);
+        assert_eq!(np, nps[i as usize - 1], "{} -> {}", i, np);
     }
 }

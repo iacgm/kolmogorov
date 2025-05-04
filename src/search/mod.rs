@@ -12,7 +12,7 @@ pub use analysis::*;
 pub use semantics::*;
 
 use super::*;
-use cache::*;
+pub use cache::*;
 use node::*;
 
 use std::rc::Rc;
@@ -22,6 +22,16 @@ pub fn search<'a, L: Language>(
     vars: VarsVec,
     targ: &Type,
     size: usize,
+) -> Enumerator<'a, L> {
+    search_with_cache(lang, vars, targ, size, Cache::new())
+}
+
+pub fn search_with_cache<'a, L: Language>(
+    lang: &'a L,
+    vars: VarsVec,
+    targ: &Type,
+    size: usize,
+    cache: Cache<L>,
 ) -> Enumerator<'a, L> {
     let ctxt = lang.context();
 
@@ -37,14 +47,14 @@ pub fn search<'a, L: Language>(
             ctxt,
             vgen,
             args: vars,
-            cache: Cache::new(),
+            cache,
         },
         root: Node::All {
             targ: Rc::new(targ.clone()),
             size,
             state: None,
             phase: AllPhase::START,
-            depth: None
+            depth: None,
         },
     }
 }
@@ -52,6 +62,12 @@ pub fn search<'a, L: Language>(
 pub struct Enumerator<'a, L: Language> {
     search_ctxt: SearchContext<'a, L>,
     root: Node<L>,
+}
+
+impl<L:Language> Enumerator<'_, L> {
+    pub fn cache(self) -> Cache<L> {
+        self.search_ctxt.cache
+    }
 }
 
 pub type VarDecl = (Identifier, Rc<Type>);
@@ -75,7 +91,6 @@ impl<L: Language> SearchContext<'_, L> {
     }
 
     fn vars_producing(&mut self, targ: &Rc<Type>) -> VarsVec {
-
         fn produces(ty: &Type, target: &Type) -> bool {
             let ret_ty_produces = match ty {
                 Type::Fun(_, r) => produces(r, target),

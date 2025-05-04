@@ -8,19 +8,21 @@ use utils::oeis::*;
 
 fn main() {
     let lang = NumLogic::new(2);
-    let ty = ty!(Var => Bool);
+    let ty = ty!(Var => Num);
 
     let oeis = load_oeis(&OEISLoadOptions {
-        required: vec!["nonn"],
+        required: vec!["nonn", "nice", "easy"],
         ..Default::default()
     })
     .unwrap();
 
-    let key = 1358;
+    let key = 10;
 
     let nums: Vec<u32> = oeis.seq[&key].iter().map(|n| *n as u32).collect();
 
-    let limit = *nums.last().unwrap();
+    dbg!(&nums);
+
+    let limit = nums.len() as u32;
 
     let programs = (1..)
         .inspect(|n| println!("Searching size: {}", n))
@@ -29,12 +31,14 @@ fn main() {
     let start = std::time::Instant::now();
 
     'next: for (program, analysis) in programs {
-        for num in 0..limit {
-            let prog = term!([program] [:num]);
+        for i in 1..limit {
+            let prog = term!([program] [:i]);
 
-            let out = lang.context().evaluate(&prog).get::<bool>();
+            let out_prog = lang.context().evaluate(&prog);
 
-            if out != nums.contains(&num) {
+            let out = out_prog.get::<u32>();
+
+            if out != nums[i as usize - 1] {
                 continue 'next;
             }
         }

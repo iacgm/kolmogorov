@@ -3,16 +3,21 @@ use kolmogorov::*;
 mod languages;
 use languages::*;
 
+type Lang = NumLogic;
+
 fn main() {
-    let lang = NumLogic::new(2);
+    let lang = Lang::new(2);
     let ty = ty!(Var => Bool);
+
+    let mut cache = search::Cache::<Lang>::new();
 
     for n in 1.. {
         let start = std::time::Instant::now();
 
-        let searcher = search::search(&lang, vec![], &ty, n);
+        let mut searcher = search::search_with_cache(&lang, vec![], &ty, n, cache);
 
-        let count = searcher.count();
+        let count = searcher.by_ref().count();
+        cache = searcher.cache();
 
         println!(
             "There are {:>6} known-distinct programs of type {} and size {}.",

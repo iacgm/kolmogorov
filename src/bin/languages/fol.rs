@@ -71,12 +71,7 @@ impl Language for LogicLang {
         unimplemented!()
     }
 
-    fn slam(
-        &self,
-        ident: Identifier,
-        body: Analysis<Self>,
-        ty: &Type,
-    ) -> Analysis<Self> {
+    fn slam(&self, ident: Identifier, body: Analysis<Self>, ty: &Type) -> Analysis<Self> {
         use Analysis::*;
         use LogicSems::*;
 
@@ -91,12 +86,7 @@ impl Language for LogicLang {
         Canonical(Abs(ident, Rc::new(body.canon())))
     }
 
-    fn sapp(
-        &self,
-        fun: Analysis<Self>,
-        arg: Analysis<Self>,
-        _ty: &Type,
-    ) -> Analysis<Self> {
+    fn sapp(&self, fun: Analysis<Self>, arg: Analysis<Self>, _ty: &Type) -> Analysis<Self> {
         use Analysis::*;
         use LogicSems::*;
         use Predicate::*;
@@ -209,9 +199,7 @@ impl LogicSems {
         use LogicSems::*;
         match self {
             Any(Exists { body, .. }) => body.depth() + 1,
-            App(_, args) => {
-                args.iter().map(LogicSems::depth).max().unwrap_or(0)
-            }
+            App(_, args) => args.iter().map(LogicSems::depth).max().unwrap_or(0),
             _ => 0,
         }
     }
@@ -219,6 +207,9 @@ impl LogicSems {
 
 // Simple algorithm
 fn is_prime(n: u32) -> bool {
+    if n < 2 {
+        return false;
+    }
     let mut i = 2;
     while i * i < n {
         if n % i == 0 {
