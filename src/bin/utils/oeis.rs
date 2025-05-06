@@ -2,8 +2,6 @@ use std::ops::Range;
 
 use rustc_hash::FxHashMap as HashMap;
 
-const MIN_EXAMPLE_COUNT: usize = 10;
-
 #[derive(Default)]
 pub struct OEISMap {
     pub seq: HashMap<usize, Vec<i32>>,
@@ -14,6 +12,7 @@ pub struct OEISLoadOptions {
     pub required: Vec<&'static str>,
     pub disallow: Vec<&'static str>,
     pub max_val: i32,
+    pub min_len: usize,
 }
 
 impl Default for OEISLoadOptions {
@@ -25,6 +24,7 @@ impl Default for OEISLoadOptions {
                 "obsc", "word", "dupe",
             ],
             max_val: i32::MAX,
+            min_len: 10,
         }
     }
 }
@@ -90,7 +90,7 @@ pub fn load_oeis(options: &OEISLoadOptions) -> std::io::Result<OEISMap> {
             nums.push(n)
         }
 
-        if nums.len() < MIN_EXAMPLE_COUNT {
+        if nums.len() < options.min_len {
             continue;
         }
 

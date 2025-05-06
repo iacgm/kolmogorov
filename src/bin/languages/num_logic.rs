@@ -18,7 +18,6 @@ type Var = Identifier;
 pub enum Atom {
     Var(Var),
     Pow(Var, Var),
-    Sqr(Var),
 }
 
 type Atoms = Vec<Atom>;
@@ -136,11 +135,6 @@ impl Language for NumLogic {
 
                 Mul(vec![Pow(b, k)])
             }
-            App(v, _) if v.as_str() == "sqr" => {
-                let Mul(mut v) = arg else { unreachable!() };
-                let Var(v) = v.remove(0) else { unreachable!() };
-                Mul(vec![Sqr(v)])
-            }
             App(v, mut args) if v.as_str() == "mul" && args.len() == 1 => {
                 let (Mul(mut l), Mul(r)) = (args.remove(0), arg) else {
                     unreachable!()
@@ -185,8 +179,7 @@ impl Language for NumLogic {
                 And(bools)
             }
             App(v, mut args)
-                if ["sigma", "count", "exists"].contains(&v.as_str())
-                    && args.len() == 1 =>
+                if ["sigma", "count", "exists"].contains(&v.as_str()) && args.len() == 1 =>
             {
                 let Mul(mut sum) = args.remove(0) else {
                     unreachable!()
@@ -218,6 +211,7 @@ impl Language for NumLogic {
                     body,
                 })
             }
+            App(v, _) if ["num", "atom", "to_bool"].contains(&v.as_str()) => arg,
             App(v, mut args) => {
                 args.push(arg);
                 App(v, args)
@@ -254,14 +248,6 @@ impl NumLogic {
             |c, p| => Term::val(int(&c).checked_pow(int(&p)).unwrap_or(0))
         };
 
-        let sqr = builtin! {
-            Var => Atom
-            |n| => {
-                let n = int(&n);
-                Term::val(n.checked_mul(n).unwrap_or(0))
-            }
-        };
-
         let mul = builtin! {
             Atom => Atom => Atom
             |l, r| => Term::val(int(&l).checked_mul(int(&r)).unwrap_or(0))
@@ -293,18 +279,23 @@ impl NumLogic {
             }
         };
 
+        let to_bool = builtin! {
+            Pred => Bool
+            |p| => p.clone()
+        };
+
         let and = builtin! {
-            Bool => Bool => Bool
+            Pred => Bool => Bool
             |a, b| => Term::val(bln(&a) && bln(&b))
         };
 
         let prime = builtin! {
-            Atom => Bool
+            Atom => Pred
             |n| => Term::val(is_prime(int(&n)))
         };
 
         let divisor = builtin! {
-            Atom => Atom => Bool
+            Atom => Atom => Pred
             |p, q| => {
                 let p = int(&p);
                 let q = int(&q);
@@ -313,19 +304,19 @@ impl NumLogic {
         };
 
         let eq = builtin! {
-            Atom => Atom => Bool
+            Atom => Atom => Pred
             |l, r| => Term::val(int(&l) == int(&r))
         };
 
         let less = builtin! {
-            Atom => Atom => Bool
+            Atom => Atom => Pred
             |l, r| => Term::val(int(&l) < int(&r))
         };
 
         vec![
             ("num".into(), num),
-            ("sqr".into(), sqr),
             ("atom".into(), atom),
+            ("bool".into(), to_bool),
             ("pow".into(), pow),
             ("mul".into(), mul),
             ("count".into(), count),
@@ -373,15 +364,14 @@ impl Display for Atom {
         match self {
             Atom::Var(identifier) => write!(f, "{}", identifier),
             Atom::Pow(b, k) => write!(f, "{}^{}", b, k),
-            Atom::Sqr(v) => write!(f, "{}^2", v),
         }
     }
 }
 
-fn fmt_sum(f: &mut std::fmt::Formatter<'_>, sum: &Atoms) -> std::fmt::Result {
+fn fmt_mul(f: &mut std::fmt::Formatter<'_>, sum: &Atoms) -> std::fmt::Result {
     write!(f, "({}", sum[0])?;
     for s in &sum[1..] {
-        write!(f, "+{}", s)?;
+        write!(f, "*{}", s)?;
     }
     write!(f, ")")
 }
@@ -392,22 +382,22 @@ impl Display for Predicate {
         match self {
             Prime(sum) => {
                 write!(f, "Prime")?;
-                fmt_sum(f, sum)
+                fmt_mul(f, sum)
             }
             Divisor(p, q) => {
-                fmt_sum(f, p)?;
+                fmt_mul(f, p)?;
                 write!(f, "|")?;
-                fmt_sum(f, q)
+                fmt_mul(f, q)
             }
             Eq(l, r) => {
-                fmt_sum(f, l)?;
+                fmt_mul(f, l)?;
                 write!(f, "=")?;
-                fmt_sum(f, r)
+                fmt_mul(f, r)
             }
             Less(l, r) => {
-                fmt_sum(f, l)?;
+                fmt_mul(f, l)?;
                 write!(f, "<")?;
-                fmt_sum(f, r)
+                fmt_mul(f, r)
             }
         }
     }
@@ -417,7 +407,7 @@ impl Display for NumLogicSems {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         use NumLogicSems::*;
         match self {
-            Mul(sum) => fmt_sum(f, sum),
+            Mul(sum) => fmt_mul(f, sum),
             And(items) => {
                 write!(f, "{}", items[0].1)?;
                 for cond in &items[1..] {
