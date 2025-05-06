@@ -14,10 +14,9 @@ fn main() {
     for n in 1.. {
         let start = std::time::Instant::now();
 
-        let mut searcher = search::search_with_cache(&lang, vec![], &ty, n, cache);
+        let mut searcher = search::search(&lang, vec![], &ty, n);
 
         let count = searcher.by_ref().count();
-        cache = searcher.cache();
 
         println!(
             "There are {:>6} known-distinct programs of type {} and size {}.",

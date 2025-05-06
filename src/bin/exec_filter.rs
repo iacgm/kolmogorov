@@ -9,7 +9,7 @@ use utils::*;
 fn main() {
     let lang = NumLogic::new(2);
 
-    let term = term!(n -> exists n (a -> exists n (b -> and (prime b) (and (prime (atom a)) (eq (mul (atom a) (atom b)) n)))));
+    let term = term!(f -> exists f (b -> exists f (k -> and (prime (atom b)) (bool (eq (atom f) (pow b k))))));
 
     dbg!(term.size());
 
@@ -19,7 +19,7 @@ fn main() {
     })
     .unwrap();
 
-    let key = dbg!(1358);
+    let key = dbg!(246655);
 
     let nps: Vec<u32> = oeis.seq[&key].iter().map(|n| *n as u32).collect();
 

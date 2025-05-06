@@ -16,7 +16,7 @@ fn main() {
     })
     .unwrap();
 
-    let key = 1358;
+    let key = 246655;
 
     let nums: Vec<u32> = oeis.seq[&key].iter().map(|n| *n as u32).collect();
 

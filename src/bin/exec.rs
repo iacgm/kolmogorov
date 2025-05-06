@@ -6,7 +6,10 @@ use languages::*;
 fn main() {
     let lang = NumLogic::new(2);
 
-    let term = term!(f -> count(f)(k -> (prime(atom(k)))));
+
+    let term = term!(f -> exists f (b -> exists f (k -> and (prime (atom b)) (bool (eq (atom f) (pow b k))))));
+
+    println!("Size: {}", term.size());
 
     let nps = [
         0, 1, 2, 2, 3, 3, 4, 4, 4, 4, 5, 5, 6, 6, 6, 6, 7, 7, 8, 8, 8, 8, 9, 9, 9, 9, 9, 9, 10, 10,

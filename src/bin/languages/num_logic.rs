@@ -211,7 +211,7 @@ impl Language for NumLogic {
                     body,
                 })
             }
-            App(v, _) if ["num", "atom", "to_bool"].contains(&v.as_str()) => arg,
+            App(v, _) if ["num", "atom", "conj", "bool"].contains(&v.as_str()) => arg,
             App(v, mut args) => {
                 args.push(arg);
                 App(v, args)
@@ -280,12 +280,17 @@ impl NumLogic {
         };
 
         let to_bool = builtin! {
-            Pred => Bool
+            Conj => Bool
+            |c| => c.clone() 
+        };
+
+        let conj = builtin! {
+            Pred => Conj
             |p| => p.clone()
         };
 
         let and = builtin! {
-            Pred => Bool => Bool
+            Pred => Conj => Conj
             |a, b| => Term::val(bln(&a) && bln(&b))
         };
 
@@ -317,6 +322,7 @@ impl NumLogic {
             ("num".into(), num),
             ("atom".into(), atom),
             ("bool".into(), to_bool),
+            ("conj".into(), conj),
             ("pow".into(), pow),
             ("mul".into(), mul),
             ("count".into(), count),

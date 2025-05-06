@@ -98,7 +98,10 @@ impl<L: Language> Node<L> {
                     match phase {
                         CacheCheck => {
                             match search_ctxt.cache.prune(targ, size) {
-                                Empty => return None,
+                                Empty => {
+                                    *self = Nil;
+                                    return None;
+                                }
                                 _ => *phase = Application,
                             }
                             *depth = Some(search_ctxt.cache.begin_search(targ, size));
@@ -153,9 +156,7 @@ impl<L: Language> Node<L> {
                                 Some((term, analysis))
                             }
                             None => {
-                                search_ctxt.args.pop().unwrap();
-                                search_ctxt.vgen.freshen(ident);
-                                search_ctxt.cache.elim_var();
+                                self.exit(search_ctxt);
                                 None
                             }
                         };
@@ -180,7 +181,7 @@ impl<L: Language> Node<L> {
                     size,
                     vars,
                     state,
-                    depth
+                    depth,
                 } => {
                     if let Some(curr_state) = state {
                         match curr_state.next(search_ctxt) {
@@ -271,6 +272,7 @@ impl<L: Language> Node<L> {
                         *res = search_ctxt.cache.prune_arg(targ, l_ty, size);
 
                         if res.empty() {
+                            self.exit(search_ctxt);
                             *self = Nil;
                             return None;
                         }
@@ -297,30 +299,39 @@ impl<L: Language> Node<L> {
                     };
 
                     // Get the next arg, trying every size until we generate one.
+                    let All {
+                        size: arg_state_size,
+                        targ: arg_targ,
+                        depth: arg_depth,
+                        ..
+                    } = &**arg_state
+                    else {
+                        unreachable!()
+                    };
+                    let mut arg_state_size = *arg_state_size;
+                    let arg_targ = arg_targ.clone();
+                    let arg_depth = *arg_depth;
+
                     let ((arg, arg_analysis), arg_size) = loop {
                         if let Some(arg) = arg_state.next(search_ctxt) {
                             let size = arg.0.size();
                             break (arg, size);
                         }
 
-                        let All {
-                            size: arg_size,
-                            state,
-                            phase,
-                            ..
-                        } = &mut **arg_state
-                        else {
-                            unreachable!()
-                        };
-
-                        if *arg_size == size - 1 {
+                        if arg_state_size == size - 1 {
                             *self = Nil;
                             return None;
                         }
 
-                        *arg_size += 1;
-                        *phase = AllPhase::START;
-                        *state = None;
+                        arg_state_size += 1;
+
+                        **arg_state = All {
+                            size: arg_state_size,
+                            phase: AllPhase::START,
+                            state: None,
+                            targ: arg_targ.clone(),
+                            depth: arg_depth,
+                        };
                     };
 
                     let analysis = search_ctxt
@@ -333,8 +344,7 @@ impl<L: Language> Node<L> {
                         left.size(),
                         left,
                         analysis.clone(),
-                        depth
-
+                        depth,
                     ) {
                         *state = Some(Box::new(Arg {
                             targ: targ.clone(),
@@ -351,6 +361,44 @@ impl<L: Language> Node<L> {
                 }
                 Nil => return None,
             }
+        }
+    }
+
+    pub fn exit(&mut self, search_ctxt: &mut SearchContext<L>) {
+        use Node::*;
+        match self {
+            All { state, .. } => {
+                if let Some(state) = state.take().as_mut() {
+                    state.exit(search_ctxt);
+                }
+            }
+            Abs {
+                state: Some(state),
+                ident,
+                ..
+            } => {
+                state.exit(search_ctxt);
+                let ident = ident.unwrap();
+                search_ctxt.args.pop().unwrap();
+                search_ctxt.vgen.freshen(ident);
+                search_ctxt.cache.elim_var();
+            }
+            Var {
+                state: Some(state), ..
+            } => {
+                state.exit(search_ctxt);
+            }
+            Arg {
+                state, arg_state, ..
+            } => {
+                if let Some(state) = state.take().as_mut() {
+                    state.exit(search_ctxt);
+                }
+                if let Some(state) = arg_state.take().as_mut() {
+                    state.exit(search_ctxt);
+                }
+            }
+            _ => {}
         }
     }
 }

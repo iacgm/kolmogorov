@@ -8,19 +8,11 @@ fn main() {
 
     let ty = ty!(Var => Bool);
 
-    for n in 11..=11 {
+    for n in 1.. {
         println!("Round {}", n);
         let start = std::time::Instant::now();
 
-        let searcher = search(
-            &lang,
-            vec![
-                (Identifier::Name("x"), ty!(Var).into()),
-                (Identifier::Name("v"), ty!(Var).into()),
-            ],
-            &ty,
-            n,
-        );
+        let searcher = search(&lang, vec![], &ty, n);
 
         let mut count = 0;
 
